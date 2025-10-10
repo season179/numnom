@@ -1,0 +1,22 @@
+{
+  "manifest_version": 3,
+  "name": "Table Detector",
+  "version": "1.0.0",
+  "description": "Detects HTML tables on web pages and shows an indicator",
+  "permissions": [
+    "activeTab"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "action": {
+    "default_title": "Table Detector"
+  }
+}
