@@ -8,11 +8,35 @@ interface TableCountMessage {
 }
 
 /**
+ * Checks if a table has both "open" and "close" columns
+ */
+function hasOpenAndCloseColumns(table: HTMLTableElement): boolean {
+  // Get all header cells from thead or first row
+  const headerCells = Array.from(
+    table.querySelectorAll('thead th, thead td, tr:first-child th, tr:first-child td')
+  );
+
+  // Extract text content and normalize to lowercase
+  const columnNames = headerCells.map((cell) =>
+    cell.textContent?.trim().toLowerCase() || ''
+  );
+
+  // Check if both "open" and "close" columns exist
+  const hasOpen = columnNames.some((name) => name === 'open');
+  const hasClose = columnNames.some((name) => name === 'close');
+
+  return hasOpen && hasClose;
+}
+
+/**
  * Detects tables on the current page and sends count to background script
  */
 function detectTables(): void {
-  const tables = document.querySelectorAll('table');
-  const tableCount = tables.length;
+  const allTables = document.querySelectorAll('table');
+  const validTables = Array.from(allTables).filter((table) =>
+    hasOpenAndCloseColumns(table as HTMLTableElement)
+  );
+  const tableCount = validTables.length;
 
   const message: TableCountMessage = {
     action: 'updateBadge',
