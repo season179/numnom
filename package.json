@@ -1,12 +1,12 @@
 {
   "name": "table-detector-extension",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Browser extension that detects HTML tables on web pages",
   "scripts": {
     "build": "bun run build:clean && bun run build:scripts && bun run build:copy",
     "build:clean": "rm -rf dist && mkdir -p dist",
-    "build:scripts": "bun build src/content/index.ts --outfile dist/content.js --target browser && bun build src/background/index.ts --outfile dist/background.js --target browser",
-    "build:copy": "cp public/manifest.json dist/ && cp public/icon.png dist/",
+    "build:scripts": "bun build src/content/index.ts --outfile dist/content.js --target browser && bun build src/background/index.ts --outfile dist/background.js --target browser && bun build src/popup/index.ts --outfile dist/popup.js --target browser",
+    "build:copy": "cp public/manifest.json dist/ && cp public/icon.png dist/ && cp public/popup.html dist/",
     "dev": "bun run build",
     "lint": "biome check .",
     "lint:fix": "biome check --write .",
@@ -18,5 +18,9 @@
     "@types/chrome": "^0.0.277",
     "bun-types": "latest"
   },
-  "type": "module"
+  "type": "module",
+  "dependencies": {
+    "@types/papaparse": "^5.3.16",
+    "papaparse": "^5.5.3"
+  }
 }
