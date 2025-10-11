@@ -63,12 +63,18 @@ function hasOpenAndCloseColumns(table: HTMLTableElement): boolean {
 
 /**
  * Converts an HTML table to a 2D array of strings
+ * Normalizes Unicode minus signs to ASCII hyphens for Excel compatibility
  */
 function tableToArray(table: HTMLTableElement): string[][] {
   const rows = Array.from(table.querySelectorAll('tr'));
   return rows.map((row) => {
     const cells = Array.from(row.querySelectorAll('th, td'));
-    return cells.map((cell) => cell.textContent?.trim() || '');
+    return cells.map((cell) => {
+      const text = cell.textContent?.trim() || '';
+      // Replace Unicode minus (U+2212) with ASCII hyphen-minus (U+002D)
+      // Replace middle dot (U+00B7) with space for Excel compatibility
+      return text.replace(/−/g, '-').replace(/·/g, ' ');
+    });
   });
 }
 
@@ -87,9 +93,14 @@ function getValidTables(): TablesResponse {
 
   const tables = validTables.map((table, index) => {
     const data = tableToArray(table as HTMLTableElement);
-    const csvData = Papa.unparse(data);
-    const rows = data.length;
-    const columns = data[0]?.length || 0;
+    // Filter out completely empty rows
+    const filteredData = data.filter((row) => row.some((cell) => cell !== ''));
+    const csvData = Papa.unparse(filteredData, {
+      quotes: true, // Wrap all fields in double quotes
+      skipEmptyLines: true,
+    });
+    const rows = filteredData.length;
+    const columns = filteredData[0]?.length || 0;
     console.log(`Table Detector: Table ${index + 1} - ${rows} rows × ${columns} columns`);
 
     return {
@@ -331,15 +342,21 @@ async function handleFullDownload(tableIndex: number): Promise<void> {
       chrome.runtime.sendMessage(update).catch(console.error);
     });
 
-    // Generate CSV from all collected rows
-    const csvData = Papa.unparse(allRows);
+    // Filter out completely empty rows
+    const filteredRows = allRows.filter((row) => row.some((cell) => cell !== ''));
 
-    console.log(`Table Detector: Generated CSV with ${allRows.length} rows`);
+    // Generate CSV from all collected rows
+    const csvData = Papa.unparse(filteredRows, {
+      quotes: true, // Wrap all fields in double quotes
+      skipEmptyLines: true,
+    });
+
+    console.log(`Table Detector: Generated CSV with ${filteredRows.length} rows`);
 
     chrome.runtime.sendMessage({
       action: 'downloadProgress',
       progress: 100,
-      rowsCollected: allRows.length,
+      rowsCollected: filteredRows.length,
       status: 'complete',
       csvData,
     } as ProgressUpdate);
