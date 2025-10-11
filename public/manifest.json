@@ -3,9 +3,7 @@
   "name": "Table Detector",
   "version": "1.0.0",
   "description": "Detects HTML tables on web pages and shows an indicator",
-  "permissions": [
-    "activeTab"
-  ],
+  "permissions": ["activeTab"],
   "background": {
     "service_worker": "background.js"
   },
