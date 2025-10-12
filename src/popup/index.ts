@@ -26,12 +26,15 @@ interface ProgressUpdate {
   error?: string;
 }
 
+type TableType = 'price' | 'dividend';
+
 interface TablesResponse {
   tables: Array<{
     index: number;
     rows: number;
     columns: number;
     csvData: string;
+    type: TableType;
   }>;
 }
 
@@ -144,7 +147,7 @@ function renderTables(tables: TablesResponse['tables']): void {
   if (tables.length === 0) {
     content.innerHTML = `
       <div class="status empty">
-        No tables with "open" and "close" columns found on this page.
+        No price or dividend tables found on this page.
       </div>
     `;
     return;
@@ -152,10 +155,12 @@ function renderTables(tables: TablesResponse['tables']): void {
 
   const tableListHTML = tables
     .map(
-      (table) => `
+      (table) => {
+        const typeLabel = table.type === 'price' ? 'Price Data' : 'Dividend Data';
+        return `
     <div class="table-item">
       <div class="table-info">
-        <div class="table-header">Table ${table.index + 1} (${table.rows} rows × ${table.columns} cols)</div>
+        <div class="table-header">Table ${table.index + 1} - ${typeLabel} (${table.rows} rows × ${table.columns} cols)</div>
         <div class="progress-container" id="progress-${table.index}" style="display: none;">
           <div class="progress-bar">
             <div class="progress-fill"></div>
@@ -169,7 +174,8 @@ function renderTables(tables: TablesResponse['tables']): void {
         <button class="btn-cancel" id="cancel-${table.index}" data-index="${table.index}" style="display: none;">Cancel</button>
       </div>
     </div>
-  `
+  `;
+      }
     )
     .join('');
 

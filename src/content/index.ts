@@ -33,12 +33,15 @@ interface ProgressUpdate {
   error?: string;
 }
 
+type TableType = 'price' | 'dividend';
+
 interface TablesResponse {
   tables: Array<{
     index: number;
     rows: number;
     columns: number;
     csvData: string;
+    type: TableType;
   }>;
 }
 
@@ -62,6 +65,51 @@ function hasOpenAndCloseColumns(table: HTMLTableElement): boolean {
 }
 
 /**
+ * Checks if a table has dividend columns:
+ * Announced, Financial Year, Subject, EX Date, Payment Date, Amount, Indicator
+ */
+function hasDividendColumns(table: HTMLTableElement): boolean {
+  // Get all header cells from thead or first row
+  const headerCells = Array.from(
+    table.querySelectorAll('thead th, thead td, tr:first-child th, tr:first-child td')
+  );
+
+  // Extract text content and normalize to lowercase
+  const columnNames = headerCells.map((cell) => cell.textContent?.trim().toLowerCase() || '');
+
+  // Check for key dividend columns (at least 4 of the 7)
+  const requiredColumns = [
+    'announced',
+    'financial year',
+    'subject',
+    'ex date',
+    'payment date',
+    'amount',
+    'indicator',
+  ];
+
+  const matchCount = requiredColumns.filter((required) =>
+    columnNames.some((name) => name === required)
+  ).length;
+
+  // Consider it a dividend table if at least 4 of the 7 columns are present
+  return matchCount >= 4;
+}
+
+/**
+ * Determines the type of table based on its columns
+ */
+function getTableType(table: HTMLTableElement): TableType | null {
+  if (hasOpenAndCloseColumns(table)) {
+    return 'price';
+  }
+  if (hasDividendColumns(table)) {
+    return 'dividend';
+  }
+  return null;
+}
+
+/**
  * Converts an HTML table to a 2D array of strings
  * Normalizes Unicode minus signs to ASCII hyphens for Excel compatibility
  */
@@ -79,6 +127,55 @@ function tableToArray(table: HTMLTableElement): string[][] {
 }
 
 /**
+ * Cleans dividend table data by:
+ * 1. Removing columns that only contain "view"
+ * 2. Removing rows without dividend amounts
+ */
+function cleanDividendData(data: string[][]): string[][] {
+  if (data.length === 0) return data;
+
+  const headerRow = data[0];
+  if (!headerRow) return data;
+
+  const dataRows = data.slice(1);
+
+  // Step 1: Identify columns to keep (remove "view" columns)
+  const columnsToKeep: number[] = [];
+  for (let colIndex = 0; colIndex < headerRow.length; colIndex++) {
+    // Check if this column contains only "view" (case-insensitive) or empty values
+    // Note: Some rows might have fewer columns (e.g., separator rows with colspan)
+    const hasNonViewContent = dataRows.some((row) => {
+      const cell = row[colIndex]?.toLowerCase().trim() || '';
+      return cell !== 'view' && cell !== '';
+    });
+    
+    if (hasNonViewContent) {
+      columnsToKeep.push(colIndex);
+    }
+  }
+
+  // Step 2: Filter columns
+  const filteredHeader = columnsToKeep.map((i) => headerRow[i] || '');
+  const filteredRows = dataRows.map((row) => columnsToKeep.map((i) => row[i] || ''));
+
+  // Step 3: Find "Amount" column index in filtered data
+  const amountIndex = filteredHeader.findIndex(
+    (header) => header.toLowerCase().trim() === 'amount'
+  );
+
+  // Step 4: Remove rows without amount values
+  let cleanedRows = filteredRows;
+  if (amountIndex !== -1) {
+    cleanedRows = filteredRows.filter((row) => {
+      const amountValue = row[amountIndex]?.trim();
+      return amountValue !== '' && amountValue !== '-';
+    });
+  }
+
+  return [filteredHeader, ...cleanedRows];
+}
+
+/**
  * Gets all valid tables and converts them to CSV format
  */
 function getValidTables(): TablesResponse {
@@ -86,28 +183,43 @@ function getValidTables(): TablesResponse {
   const allTables = document.querySelectorAll('table');
   console.log(`Table Detector: Found ${allTables.length} total tables on page`);
 
-  const validTables = Array.from(allTables).filter((table) =>
-    hasOpenAndCloseColumns(table as HTMLTableElement)
-  );
-  console.log(`Table Detector: ${validTables.length} tables have "open" and "close" columns`);
+  const validTablesWithTypes = Array.from(allTables)
+    .map((table) => {
+      const type = getTableType(table as HTMLTableElement);
+      return type ? { table: table as HTMLTableElement, type } : null;
+    })
+    .filter((item): item is { table: HTMLTableElement; type: TableType } => item !== null);
 
-  const tables = validTables.map((table, index) => {
-    const data = tableToArray(table as HTMLTableElement);
+  console.log(
+    `Table Detector: ${validTablesWithTypes.length} valid tables found (price: ${validTablesWithTypes.filter((t) => t.type === 'price').length}, dividend: ${validTablesWithTypes.filter((t) => t.type === 'dividend').length})`
+  );
+
+  const tables = validTablesWithTypes.map(({ table, type }, index) => {
+    let data = tableToArray(table);
     // Filter out completely empty rows
-    const filteredData = data.filter((row) => row.some((cell) => cell !== ''));
-    const csvData = Papa.unparse(filteredData, {
+    data = data.filter((row) => row.some((cell) => cell !== ''));
+    
+    // Apply dividend-specific cleaning
+    if (type === 'dividend') {
+      data = cleanDividendData(data);
+    }
+    
+    const csvData = Papa.unparse(data, {
       quotes: true, // Wrap all fields in double quotes
       skipEmptyLines: true,
     });
-    const rows = filteredData.length;
-    const columns = filteredData[0]?.length || 0;
-    console.log(`Table Detector: Table ${index + 1} - ${rows} rows × ${columns} columns`);
+    const rows = data.length;
+    const columns = data[0]?.length || 0;
+    console.log(
+      `Table Detector: Table ${index + 1} (${type}) - ${rows} rows × ${columns} columns`
+    );
 
     return {
       index,
       rows,
       columns,
       csvData,
+      type,
     };
   });
 
@@ -120,9 +232,10 @@ function getValidTables(): TablesResponse {
  */
 function detectTables(): void {
   const allTables = document.querySelectorAll('table');
-  const validTables = Array.from(allTables).filter((table) =>
-    hasOpenAndCloseColumns(table as HTMLTableElement)
-  );
+  const validTables = Array.from(allTables).filter((table) => {
+    const type = getTableType(table as HTMLTableElement);
+    return type !== null;
+  });
   const tableCount = validTables.length;
 
   const message: TableCountMessage = {
@@ -319,9 +432,10 @@ async function handleFullDownload(tableIndex: number): Promise<void> {
   console.log(`Table Detector: Starting full download for table ${tableIndex}`);
 
   const allTables = document.querySelectorAll('table');
-  const validTables = Array.from(allTables).filter((table) =>
-    hasOpenAndCloseColumns(table as HTMLTableElement)
-  );
+  const validTables = Array.from(allTables).filter((table) => {
+    const type = getTableType(table as HTMLTableElement);
+    return type !== null;
+  });
 
   if (tableIndex >= validTables.length) {
     console.error('Table Detector: Invalid table index');
@@ -336,6 +450,7 @@ async function handleFullDownload(tableIndex: number): Promise<void> {
   }
 
   const table = validTables[tableIndex] as HTMLTableElement;
+  const tableType = getTableType(table);
 
   try {
     const allRows = await scrollAndCollectRows(table, (update) => {
@@ -343,7 +458,12 @@ async function handleFullDownload(tableIndex: number): Promise<void> {
     });
 
     // Filter out completely empty rows
-    const filteredRows = allRows.filter((row) => row.some((cell) => cell !== ''));
+    let filteredRows = allRows.filter((row) => row.some((cell) => cell !== ''));
+
+    // Apply dividend-specific cleaning
+    if (tableType === 'dividend') {
+      filteredRows = cleanDividendData(filteredRows);
+    }
 
     // Generate CSV from all collected rows
     const csvData = Papa.unparse(filteredRows, {
