@@ -36,21 +36,37 @@ interface TablesResponse {
     csvData: string;
     type: TableType;
   }>;
+  ticker: string;
 }
 
 // State for tracking full downloads
 let currentDownloadIndex: number | null = null;
 let activeTabId: number | null = null;
+let currentTicker = 'unknown';
+
+/**
+ * Formats date as yyyymmdd
+ */
+function formatDate(date: Date): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}${month}${day}`;
+}
 
 /**
  * Triggers a download of the CSV file
  */
-function downloadCSV(csvData: string, index: number, isFull = false): void {
+function downloadCSV(csvData: string, tableType: TableType, ticker: string): void {
   const blob = new Blob([csvData], { type: 'text/csv;charset=utf-8;' });
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
   link.href = url;
-  link.download = `table_${index + 1}${isFull ? '_full' : ''}_${Date.now()}.csv`;
+  
+  const dateStr = formatDate(new Date());
+  const typeStr = tableType === 'price' ? 'heikin-ashi' : 'dividend';
+  link.download = `${dateStr}-${ticker}-${typeStr}.csv`;
+  
   link.click();
   URL.revokeObjectURL(url);
 }
@@ -191,7 +207,7 @@ function renderTables(tables: TablesResponse['tables']): void {
       const index = Number.parseInt((button as HTMLButtonElement).dataset.index || '0');
       const table = tables[index];
       if (table) {
-        downloadCSV(table.csvData, index, false);
+        downloadCSV(table.csvData, table.type, currentTicker);
       }
     });
   }
@@ -243,6 +259,7 @@ async function fetchTables(): Promise<void> {
     const response = (await chrome.tabs.sendMessage(tab.id, message)) as TablesResponse;
     console.log('Popup: Received response:', response);
 
+    currentTicker = response.ticker;
     renderTables(response.tables);
   } catch (err) {
     console.error('Popup: Error fetching tables:', err);
@@ -263,7 +280,15 @@ chrome.runtime.onMessage.addListener((message: ProgressUpdate) => {
       updateProgress(currentDownloadIndex, message.progress, message.rowsCollected, message.status);
 
       if (message.status === 'complete' && message.csvData) {
-        downloadCSV(message.csvData, currentDownloadIndex, true);
+        // Get the table type from the stored tables
+        const content = document.getElementById('content');
+        const tableElements = content?.querySelectorAll('.table-item');
+        if (tableElements && tableElements[currentDownloadIndex]) {
+          const tableElement = tableElements[currentDownloadIndex];
+          const headerText = tableElement?.querySelector('.table-header')?.textContent || '';
+          const tableType: TableType = headerText.includes('Dividend') ? 'dividend' : 'price';
+          downloadCSV(message.csvData, tableType, currentTicker);
+        }
         const fullBtn = document.getElementById(
           `full-${currentDownloadIndex}`
         ) as HTMLButtonElement;

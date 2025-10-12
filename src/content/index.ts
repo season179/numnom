@@ -43,6 +43,43 @@ interface TablesResponse {
     csvData: string;
     type: TableType;
   }>;
+  ticker: string;
+}
+
+/**
+ * Extracts stock ticker from the TradingView page
+ */
+function extractStockTicker(): string {
+  // Try to extract from URL first
+  const urlParams = new URLSearchParams(window.location.search);
+  const symbolParam = urlParams.get('symbol');
+  if (symbolParam) {
+    return symbolParam.split(':').pop()?.toLowerCase() || 'unknown';
+  }
+
+  // Try to extract from page title
+  const titleMatch = document.title.match(/([A-Z0-9]+)/);
+  if (titleMatch && titleMatch[1]) {
+    return titleMatch[1].toLowerCase();
+  }
+
+  // Try to find ticker in chart header or other elements
+  const tickerElement = document.querySelector('[data-name="legend-source-title"]');
+  if (tickerElement?.textContent) {
+    const text = tickerElement.textContent.trim();
+    const match = text.match(/([A-Z0-9]+)/);
+    if (match && match[1]) {
+      return match[1].toLowerCase();
+    }
+  }
+
+  // Fallback to hostname parsing
+  const pathMatch = window.location.pathname.match(/\/symbols?\/([^\/]+)/);
+  if (pathMatch && pathMatch[1]) {
+    return pathMatch[1].toLowerCase();
+  }
+
+  return 'unknown';
 }
 
 /**
@@ -223,8 +260,10 @@ function getValidTables(): TablesResponse {
     };
   });
 
+  const ticker = extractStockTicker();
+  console.log('Table Detector: Extracted ticker:', ticker);
   console.log('Table Detector: Returning tables response');
-  return { tables };
+  return { tables, ticker };
 }
 
 /**
@@ -515,7 +554,7 @@ chrome.runtime.onMessage.addListener(
         sendResponse(response);
       } catch (err) {
         console.error('Table Detector: Error processing getTables:', err);
-        sendResponse({ tables: [] });
+        sendResponse({ tables: [], ticker: 'unknown' });
       }
     } else if (message.action === 'startFullDownload') {
       console.log('Table Detector: Processing startFullDownload request');

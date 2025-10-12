@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Table Detector",
-  "version": "1.2.2",
+  "version": "1.2.3",
   "description": "Detects HTML tables on web pages and shows an indicator",
   "permissions": ["activeTab"],
   "background": {
