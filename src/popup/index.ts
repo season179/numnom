@@ -2,57 +2,23 @@
  * Popup script that displays detected tables and allows CSV download
  */
 
+import { BUTTON_RESET_DELAY_MS } from '../shared/constants';
+import type {
+  CancelDownloadMessage,
+  GetTablesMessage,
+  ProgressUpdate,
+  StartFullDownloadMessage,
+  TableType,
+  TablesResponse,
+} from '../shared/types';
+import { formatDateForFilename } from '../shared/utils';
+
 console.log('Popup: Script loaded!');
-
-interface GetTablesMessage {
-  action: 'getTables';
-}
-
-interface StartFullDownloadMessage {
-  action: 'startFullDownload';
-  tableIndex: number;
-}
-
-interface CancelDownloadMessage {
-  action: 'cancelDownload';
-}
-
-interface ProgressUpdate {
-  action: 'downloadProgress';
-  progress: number;
-  rowsCollected: number;
-  status: 'scrolling' | 'complete' | 'error' | 'cancelled';
-  csvData?: string;
-  error?: string;
-}
-
-type TableType = 'price' | 'dividend';
-
-interface TablesResponse {
-  tables: Array<{
-    index: number;
-    rows: number;
-    columns: number;
-    csvData: string;
-    type: TableType;
-  }>;
-  ticker: string;
-}
 
 // State for tracking full downloads
 let currentDownloadIndex: number | null = null;
 let activeTabId: number | null = null;
 let currentTicker = 'unknown';
-
-/**
- * Formats date as yyyymmdd
- */
-function formatDate(date: Date): string {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  return `${year}${month}${day}`;
-}
 
 /**
  * Triggers a download of the CSV file
@@ -63,7 +29,7 @@ function downloadCSV(csvData: string, tableType: TableType, ticker: string): voi
   const link = document.createElement('a');
   link.href = url;
 
-  const dateStr = formatDate(new Date());
+  const dateStr = formatDateForFilename(new Date());
   const typeStr = tableType === 'price' ? 'heikin-ashi' : 'dividend';
   link.download = `${dateStr}-${ticker}-${typeStr}.csv`;
 
@@ -118,10 +84,10 @@ function updateProgress(
 
     if (btnText) {
       btnText.textContent = status === 'cancelled' ? 'Cancelled' : 'Error';
-      // Reset to "Download" after 2 seconds
+      // Reset to "Download" after delay
       setTimeout(() => {
         if (btnText) btnText.textContent = 'Download';
-      }, 2000);
+      }, BUTTON_RESET_DELAY_MS);
     }
   }
 }

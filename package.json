@@ -15,7 +15,6 @@
   },
   "devDependencies": {
     "@biomejs/biome": "^1.9.4",
-    "@napi-rs/canvas": "^0.1.88",
     "@types/chrome": "^0.0.277",
     "bun-types": "latest"
   },

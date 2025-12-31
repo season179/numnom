@@ -2,10 +2,8 @@
  * Background service worker that updates the extension badge
  */
 
-interface TableCountMessage {
-  action: 'updateBadge';
-  tableCount: number;
-}
+import { BADGE_COLOR_TABLES_FOUND } from '../shared/constants';
+import type { TableCountMessage } from '../shared/types';
 
 /**
  * Updates the extension badge based on table count
@@ -18,7 +16,7 @@ function updateBadge(tabId: number, tableCount: number): void {
       tabId,
     });
     chrome.action.setBadgeBackgroundColor({
-      color: '#00AA00',
+      color: BADGE_COLOR_TABLES_FOUND,
       tabId,
     });
     chrome.action.setTitle({

@@ -1,5 +1,17 @@
 {
   "permissions": {
-    "allow": ["Skill(canvas-design)", "Bash(bun add:*)", "Bash(bun run:*)"]
+    "allow": [
+      "Skill(canvas-design)",
+      "Bash(bun add:*)",
+      "Bash(bun run:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git push:*)",
+      "WebSearch",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:www.npmjs.com)",
+      "WebFetch(domain:www.30secondsofcode.org)",
+      "Bash(wc:*)"
+    ]
   }
 }
