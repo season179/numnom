@@ -4,7 +4,12 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-A Chrome extension (Manifest V3) that detects HTML `<table>` elements with "open" and "close" columns on web pages, displays the count via a badge on the extension icon, and allows users to download the tables as CSV files. Built with TypeScript, uses Bun as the runtime/bundler, Biome for linting/formatting, and PapaParse for CSV conversion.
+**NumNom** is a Chrome extension (Manifest V3) that detects financial tables on web pages and allows users to download them as CSV files. It detects two types of tables:
+
+1. **Price tables**: Tables with both "open" and "close" columns
+2. **Dividend tables**: Tables with dividend-related columns (announced, financial year, subject, ex date, payment date, amount, indicator)
+
+Built with TypeScript, uses Bun as the runtime/bundler, Biome for linting/formatting, and PapaParse for CSV conversion.
 
 ## Build System
 
@@ -39,11 +44,12 @@ Two independent flows:
 ### Components
 
 1. **Content Script** (src/content/index.ts)
-   - Runs on tradingview.com at document_idle
-   - Detects tables with both "open" and "close" columns (case-insensitive)
+   - Runs on all URLs at document_idle
+   - Detects price tables (open/close columns) and dividend tables
    - Uses MutationObserver to detect dynamically added tables
    - Sends `TableCountMessage` to background script for badge updates
    - Responds to `GetTablesMessage` from popup with table data
+   - Supports full download with auto-scroll for lazy-loaded tables
    - Converts tables to CSV using PapaParse library
 
 2. **Background Service Worker** (src/background/index.ts)
@@ -55,8 +61,8 @@ Two independent flows:
    - Opens when user clicks extension icon
    - Requests table data from active tab's content script
    - Displays list of detected tables with row/column counts
-   - Provides download buttons for each table
-   - Generates CSV files with timestamp in filename
+   - Provides Quick CSV and Full CSV download options
+   - Shows progress during full download with cancel option
 
 ### Message Interfaces
 ```typescript
@@ -75,7 +81,9 @@ interface TablesResponse {
     rows: number;
     columns: number;
     csvData: string;
+    type: 'price' | 'dividend';
   }>;
+  ticker: string;
 }
 ```
 These interfaces are duplicated across files (no shared types currently).
@@ -98,12 +106,8 @@ Build script runs three sequential steps:
 After building, load unpacked extension from `dist/` directory at chrome://extensions/ with Developer Mode enabled.
 
 To test the extension:
-1. Navigate to tradingview.com
-2. Badge should show count of tables with "open" and "close" columns
+1. Navigate to any page with financial tables (price or dividend data)
+2. Badge should show count of detected tables
 3. Click the extension icon to open popup
-4. Popup displays list of detected tables
-5. Click "Download CSV" button to export table data
-
-## Git Status Notes
-
-Recent commits focused on table detection improvements. Project appears to be restructured from legacy files (background.js, content.js, manifest.json at root) to TypeScript source structure.
+4. Popup displays list of detected tables with type labels
+5. Use Quick CSV for visible rows or Full CSV for complete data

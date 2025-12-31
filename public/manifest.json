@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "Table Detector",
+  "name": "NumNom",
   "version": "1.2.3",
-  "description": "Detects HTML tables on web pages and shows an indicator",
+  "description": "Download stock price and dividend data",
   "permissions": ["activeTab"],
   "background": {
     "service_worker": "background.js"
@@ -15,7 +15,7 @@
     }
   ],
   "action": {
-    "default_title": "Table Detector",
+    "default_title": "NumNom",
     "default_popup": "popup.html"
   }
 }

@@ -4,7 +4,7 @@
 
 import Papa from 'papaparse';
 
-console.log('Table Detector: Content script loaded!');
+console.log('NumNom: Content script loaded!');
 
 interface TableCountMessage {
   action: 'updateBadge';
@@ -59,7 +59,7 @@ function extractStockTicker(): string {
 
   // Try to extract from page title
   const titleMatch = document.title.match(/([A-Z0-9]+)/);
-  if (titleMatch && titleMatch[1]) {
+  if (titleMatch?.[1]) {
     return titleMatch[1].toLowerCase();
   }
 
@@ -68,14 +68,14 @@ function extractStockTicker(): string {
   if (tickerElement?.textContent) {
     const text = tickerElement.textContent.trim();
     const match = text.match(/([A-Z0-9]+)/);
-    if (match && match[1]) {
+    if (match?.[1]) {
       return match[1].toLowerCase();
     }
   }
 
   // Fallback to hostname parsing
   const pathMatch = window.location.pathname.match(/\/symbols?\/([^\/]+)/);
-  if (pathMatch && pathMatch[1]) {
+  if (pathMatch?.[1]) {
     return pathMatch[1].toLowerCase();
   }
 
@@ -185,7 +185,7 @@ function cleanDividendData(data: string[][]): string[][] {
       const cell = row[colIndex]?.toLowerCase().trim() || '';
       return cell !== 'view' && cell !== '';
     });
-    
+
     if (hasNonViewContent) {
       columnsToKeep.push(colIndex);
     }
@@ -216,9 +216,9 @@ function cleanDividendData(data: string[][]): string[][] {
  * Gets all valid tables and converts them to CSV format
  */
 function getValidTables(): TablesResponse {
-  console.log('Table Detector: getValidTables() called');
+  console.log('NumNom: getValidTables() called');
   const allTables = document.querySelectorAll('table');
-  console.log(`Table Detector: Found ${allTables.length} total tables on page`);
+  console.log(`NumNom: Found ${allTables.length} total tables on page`);
 
   const validTablesWithTypes = Array.from(allTables)
     .map((table) => {
@@ -228,28 +228,26 @@ function getValidTables(): TablesResponse {
     .filter((item): item is { table: HTMLTableElement; type: TableType } => item !== null);
 
   console.log(
-    `Table Detector: ${validTablesWithTypes.length} valid tables found (price: ${validTablesWithTypes.filter((t) => t.type === 'price').length}, dividend: ${validTablesWithTypes.filter((t) => t.type === 'dividend').length})`
+    `NumNom: ${validTablesWithTypes.length} valid tables found (price: ${validTablesWithTypes.filter((t) => t.type === 'price').length}, dividend: ${validTablesWithTypes.filter((t) => t.type === 'dividend').length})`
   );
 
   const tables = validTablesWithTypes.map(({ table, type }, index) => {
     let data = tableToArray(table);
     // Filter out completely empty rows
     data = data.filter((row) => row.some((cell) => cell !== ''));
-    
+
     // Apply dividend-specific cleaning
     if (type === 'dividend') {
       data = cleanDividendData(data);
     }
-    
+
     const csvData = Papa.unparse(data, {
       quotes: true, // Wrap all fields in double quotes
       skipEmptyLines: true,
     });
     const rows = data.length;
     const columns = data[0]?.length || 0;
-    console.log(
-      `Table Detector: Table ${index + 1} (${type}) - ${rows} rows × ${columns} columns`
-    );
+    console.log(`NumNom: Table ${index + 1} (${type}) - ${rows} rows × ${columns} columns`);
 
     return {
       index,
@@ -261,8 +259,8 @@ function getValidTables(): TablesResponse {
   });
 
   const ticker = extractStockTicker();
-  console.log('Table Detector: Extracted ticker:', ticker);
-  console.log('Table Detector: Returning tables response');
+  console.log('NumNom: Extracted ticker:', ticker);
+  console.log('NumNom: Returning tables response');
   return { tables, ticker };
 }
 
@@ -283,7 +281,7 @@ function detectTables(): void {
   };
 
   chrome.runtime.sendMessage(message).catch((err) => {
-    console.log('Table Detector: Failed to send message', err);
+    console.log('NumNom: Failed to send message', err);
   });
 }
 
@@ -306,7 +304,7 @@ function setupObserver(): void {
     subtree: true,
   });
 
-  console.log('Table Detector: Observer initialized');
+  console.log('NumNom: Observer initialized');
 }
 
 // State for cancellation
@@ -359,8 +357,8 @@ async function scrollAndCollectRows(
   const container = findScrollableContainer(table);
   const uniqueRows = new Map<string, string[]>();
 
-  console.log('Table Detector: Starting scroll & collect');
-  console.log('Table Detector: Scrollable container:', container);
+  console.log('NumNom: Starting scroll & collect');
+  console.log('NumNom: Scrollable container:', container);
 
   // Collect initial rows
   const initialData = tableToArray(table);
@@ -369,7 +367,7 @@ async function scrollAndCollectRows(
   }
 
   if (!container) {
-    console.log('Table Detector: No scrollable container found');
+    console.log('NumNom: No scrollable container found');
     return Array.from(uniqueRows.values());
   }
 
@@ -394,7 +392,7 @@ async function scrollAndCollectRows(
 
   while (scrollAttempts < maxScrollAttempts && noNewRowsCount < maxNoNewRowsAttempts) {
     if (downloadCancelled) {
-      console.log('Table Detector: Download cancelled');
+      console.log('NumNom: Download cancelled');
       onProgress({
         action: 'downloadProgress',
         progress: 0,
@@ -425,7 +423,7 @@ async function scrollAndCollectRows(
     const progress = Math.min(95, Math.round((scrollTop / scrollHeight) * 100));
 
     console.log(
-      `Table Detector: Scroll progress: ${progress}%, Rows: ${uniqueRows.size}, ScrollTop: ${scrollTop}, ScrollHeight: ${scrollHeight}`
+      `NumNom: Scroll progress: ${progress}%, Rows: ${uniqueRows.size}, ScrollTop: ${scrollTop}, ScrollHeight: ${scrollHeight}`
     );
 
     onProgress({
@@ -437,7 +435,7 @@ async function scrollAndCollectRows(
 
     // Check if we've reached the bottom
     if (scrollTop + clientHeight >= scrollHeight - 10) {
-      console.log('Table Detector: Reached bottom of scroll');
+      console.log('NumNom: Reached bottom of scroll');
 
       // Wait a bit more for any final content
       await new Promise((resolve) => setTimeout(resolve, 500));
@@ -460,7 +458,7 @@ async function scrollAndCollectRows(
     }
   }
 
-  console.log(`Table Detector: Collection complete. Total unique rows: ${uniqueRows.size}`);
+  console.log(`NumNom: Collection complete. Total unique rows: ${uniqueRows.size}`);
   return Array.from(uniqueRows.values());
 }
 
@@ -468,7 +466,7 @@ async function scrollAndCollectRows(
  * Handles full download request with scrolling
  */
 async function handleFullDownload(tableIndex: number): Promise<void> {
-  console.log(`Table Detector: Starting full download for table ${tableIndex}`);
+  console.log(`NumNom: Starting full download for table ${tableIndex}`);
 
   const allTables = document.querySelectorAll('table');
   const validTables = Array.from(allTables).filter((table) => {
@@ -477,7 +475,7 @@ async function handleFullDownload(tableIndex: number): Promise<void> {
   });
 
   if (tableIndex >= validTables.length) {
-    console.error('Table Detector: Invalid table index');
+    console.error('NumNom: Invalid table index');
     chrome.runtime.sendMessage({
       action: 'downloadProgress',
       progress: 0,
@@ -510,7 +508,7 @@ async function handleFullDownload(tableIndex: number): Promise<void> {
       skipEmptyLines: true,
     });
 
-    console.log(`Table Detector: Generated CSV with ${filteredRows.length} rows`);
+    console.log(`NumNom: Generated CSV with ${filteredRows.length} rows`);
 
     chrome.runtime.sendMessage({
       action: 'downloadProgress',
@@ -520,7 +518,7 @@ async function handleFullDownload(tableIndex: number): Promise<void> {
       csvData,
     } as ProgressUpdate);
   } catch (error) {
-    console.error('Table Detector: Error during full download:', error);
+    console.error('NumNom: Error during full download:', error);
     chrome.runtime.sendMessage({
       action: 'downloadProgress',
       progress: 0,
@@ -544,24 +542,24 @@ chrome.runtime.onMessage.addListener(
     _sender: chrome.runtime.MessageSender,
     sendResponse: (response?: TablesResponse) => void
   ) => {
-    console.log('Table Detector: Received message:', message);
+    console.log('NumNom: Received message:', message);
 
     if (message.action === 'getTables') {
-      console.log('Table Detector: Processing getTables request');
+      console.log('NumNom: Processing getTables request');
       try {
         const response = getValidTables();
-        console.log('Table Detector: Sending response with', response.tables.length, 'tables');
+        console.log('NumNom: Sending response with', response.tables.length, 'tables');
         sendResponse(response);
       } catch (err) {
-        console.error('Table Detector: Error processing getTables:', err);
+        console.error('NumNom: Error processing getTables:', err);
         sendResponse({ tables: [], ticker: 'unknown' });
       }
     } else if (message.action === 'startFullDownload') {
-      console.log('Table Detector: Processing startFullDownload request');
+      console.log('NumNom: Processing startFullDownload request');
       handleFullDownload(message.tableIndex);
       // Don't call sendResponse for async operation
     } else if (message.action === 'cancelDownload') {
-      console.log('Table Detector: Processing cancelDownload request');
+      console.log('NumNom: Processing cancelDownload request');
       downloadCancelled = true;
     }
 

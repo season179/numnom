@@ -1,7 +1,7 @@
 # Full CSV Download Feature
 
 ## Problem Solved
-TradingView tables use lazy loading/virtual scrolling - only visible rows are rendered in the DOM. The previous "Quick CSV" button only captured currently visible rows, resulting in incomplete data exports.
+Many financial data tables use lazy loading/virtual scrolling - only visible rows are rendered in the DOM. The previous "Quick CSV" button only captured currently visible rows, resulting in incomplete data exports.
 
 ## Solution Implemented
 Added an **automated scroll & collect** feature that:
@@ -123,7 +123,7 @@ handleFullDownload(tableIndex: number): Promise<void>
 ## Usage Instructions
 
 ### For End Users
-1. Navigate to TradingView page with tables (must have "open" and "close" columns)
+1. Navigate to a page with financial tables (price tables with "open"/"close" columns, or dividend tables)
 2. Click extension icon to open popup
 3. You'll see two options per table:
    - **Quick CSV**: Download visible rows immediately
@@ -142,9 +142,9 @@ handleFullDownload(tableIndex: number): Promise<void>
 
 2. **Reload extension in Chrome:**
    - Go to `chrome://extensions/`
-   - Click reload icon on "Table Detector" extension
+   - Click reload icon on "NumNom" extension
 
-3. **Test on TradingView:**
+3. **Test on a financial data page:**
    - Open a page with large data table
    - Open extension popup
    - Click "Full CSV"
@@ -154,11 +154,11 @@ handleFullDownload(tableIndex: number): Promise<void>
 
 4. **Console Logs to Monitor:**
    ```
-   Table Detector: Starting scroll & collect
-   Table Detector: Scrollable container: [element]
-   Table Detector: Scroll progress: X%, Rows: Y
-   Table Detector: Reached bottom of scroll
-   Table Detector: Collection complete. Total unique rows: Z
+   NumNom: Starting scroll & collect
+   NumNom: Scrollable container: [element]
+   NumNom: Scroll progress: X%, Rows: Y
+   NumNom: Reached bottom of scroll
+   NumNom: Collection complete. Total unique rows: Z
    ```
 
 ## Performance Characteristics
@@ -178,7 +178,7 @@ handleFullDownload(tableIndex: number): Promise<void>
 ### Compatibility
 - Works with any lazy-loaded/virtual scrolled table
 - Handles both element scrolling and window scrolling
-- Compatible with TradingView's table implementation
+- Compatible with most financial data table implementations
 
 ## Known Limitations
 
@@ -192,7 +192,7 @@ handleFullDownload(tableIndex: number): Promise<void>
 1. **Resume capability**: Save progress and resume if interrupted
 2. **Smart scrolling**: Detect if table is already fully loaded
 3. **Parallel collection**: Use Intersection Observer instead of scrolling
-4. **API interception**: Hook into TradingView's data API (if accessible)
+4. **API interception**: Hook into the data API (if accessible)
 5. **Progress persistence**: Show progress even if popup closes
 
 ## Troubleshooting

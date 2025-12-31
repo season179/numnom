@@ -62,11 +62,11 @@ function downloadCSV(csvData: string, tableType: TableType, ticker: string): voi
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
   link.href = url;
-  
+
   const dateStr = formatDate(new Date());
   const typeStr = tableType === 'price' ? 'heikin-ashi' : 'dividend';
   link.download = `${dateStr}-${ticker}-${typeStr}.csv`;
-  
+
   link.click();
   URL.revokeObjectURL(url);
 }
@@ -170,10 +170,9 @@ function renderTables(tables: TablesResponse['tables']): void {
   }
 
   const tableListHTML = tables
-    .map(
-      (table) => {
-        const typeLabel = table.type === 'price' ? 'Price Data' : 'Dividend Data';
-        return `
+    .map((table) => {
+      const typeLabel = table.type === 'price' ? 'Price Data' : 'Dividend Data';
+      return `
     <div class="table-item">
       <div class="table-info">
         <div class="table-header">Table ${table.index + 1} - ${typeLabel} (${table.rows} rows × ${table.columns} cols)</div>
@@ -191,8 +190,7 @@ function renderTables(tables: TablesResponse['tables']): void {
       </div>
     </div>
   `;
-      }
-    )
+    })
     .join('');
 
   content.innerHTML = `
@@ -283,7 +281,7 @@ chrome.runtime.onMessage.addListener((message: ProgressUpdate) => {
         // Get the table type from the stored tables
         const content = document.getElementById('content');
         const tableElements = content?.querySelectorAll('.table-item');
-        if (tableElements && tableElements[currentDownloadIndex]) {
+        if (tableElements?.[currentDownloadIndex]) {
           const tableElement = tableElements[currentDownloadIndex];
           const headerText = tableElement?.querySelector('.table-header')?.textContent || '';
           const tableType: TableType = headerText.includes('Dividend') ? 'dividend' : 'price';

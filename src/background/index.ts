@@ -22,7 +22,7 @@ function updateBadge(tabId: number, tableCount: number): void {
       tabId,
     });
     chrome.action.setTitle({
-      title: `Table Detector - ${tableCount} table(s) found`,
+      title: `NumNom - ${tableCount} table(s) found`,
       tabId,
     });
   } else {
@@ -32,7 +32,7 @@ function updateBadge(tabId: number, tableCount: number): void {
       tabId,
     });
     chrome.action.setTitle({
-      title: 'Table Detector - No tables found',
+      title: 'NumNom - No tables found',
       tabId,
     });
   }

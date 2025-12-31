@@ -1,13 +1,14 @@
-# Table Detector Chrome Extension
+# NumNom Chrome Extension
 
-A modern Chrome extension built with TypeScript, Bun, and Biome that detects HTML `<table>` elements on web pages and displays an indicator badge.
+A Chrome extension that detects financial tables (price and dividend data) on web pages, displays an indicator badge, and allows CSV export.
 
 ## Features
 
-- Automatically scans pages for `<table>` elements
-- Shows a green badge with the count of tables found
+- Detects tables with price data (open/close columns) and dividend data
+- Shows a green badge with the count of detected tables
+- Quick CSV export of visible rows
+- Full CSV export with auto-scroll for lazy-loaded tables
 - Updates dynamically when tables are added/removed
-- Non-intrusive - doesn't modify page content
 - Built with TypeScript for type safety
 - Fast builds with Bun
 - Code quality enforced with Biome linter
@@ -33,13 +34,13 @@ A modern Chrome extension built with TypeScript, Bun, and Biome that detects HTM
    ```bash
    # Run linter and formatter
    bun run lint
-   
+
    # Auto-fix linting issues
    bun run lint:fix
-   
+
    # Format code
    bun run format
-   
+
    # Check and build
    bun run check
    ```
@@ -63,9 +64,21 @@ A modern Chrome extension built with TypeScript, Bun, and Biome that detects HTM
    - Select the `dist` directory
 
 5. **Test it:**
-   - Visit any webpage with tables (e.g., Wikipedia)
+   - Visit any webpage with financial tables
    - Look at the extension icon in your toolbar
    - You should see a green badge with the number of tables
+   - Click the icon to download tables as CSV
+
+## Table Detection
+
+NumNom detects two types of tables:
+
+### Price Tables
+Tables with both "open" and "close" columns (case-insensitive)
+
+### Dividend Tables
+Tables with at least 4 of these columns:
+- announced, financial year, subject, ex date, payment date, amount, indicator
 
 ## Project Structure
 
@@ -74,16 +87,19 @@ A modern Chrome extension built with TypeScript, Bun, and Biome that detects HTM
 ├── src/
 │   ├── content/
 │   │   └── index.ts         # Content script (table detection)
-│   └── background/
-│       └── index.ts         # Service worker (badge updates)
+│   ├── background/
+│   │   └── index.ts         # Service worker (badge updates)
+│   └── popup/
+│       └── index.ts         # Popup UI logic
 ├── public/
 │   ├── manifest.json        # Extension configuration
-│   └── icon.png            # Extension icon
+│   ├── popup.html           # Popup UI
+│   └── icon.png             # Extension icon
 ├── dist/                    # Build output (gitignored)
-├── package.json            # Dependencies and scripts
-├── tsconfig.json           # TypeScript configuration
-├── biome.json              # Biome linter/formatter config
-└── README.md               # This file
+├── package.json             # Dependencies and scripts
+├── tsconfig.json            # TypeScript configuration
+├── biome.json               # Biome linter/formatter config
+└── README.md                # This file
 ```
 
 ## Available Scripts
@@ -95,26 +111,10 @@ A modern Chrome extension built with TypeScript, Bun, and Biome that detects HTM
 - `bun run format` - Format code with Biome
 - `bun run check` - Lint, format, and build
 
-## How It Works
-
-1. **Content Script** (`src/content/index.ts`) runs on every page
-2. Counts `<table>` elements using `document.querySelectorAll('table')`
-3. Sends count to **Background Script** (`src/background/index.ts`)
-4. Background script updates the badge on the extension icon
-5. Green badge with number = tables found
-6. No badge = no tables on page
-
 ## Technology Stack
 
 - **TypeScript** - Type-safe JavaScript
 - **Bun** - Fast JavaScript runtime and bundler
-- **Biome** - Fast linter and formatter (replaces ESLint + Prettier)
+- **Biome** - Fast linter and formatter
+- **PapaParse** - CSV generation
 - **Chrome Extension Manifest V3** - Latest extension format
-
-## About the Icon
-
-The `icon.png` is currently a placeholder. Chrome will show a default icon. To add a custom icon:
-- Create or download a 128x128 PNG image
-- Replace `public/icon.png`
-- Rebuild with `bun run build`
-- Reload the extension in Chrome

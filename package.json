@@ -1,7 +1,7 @@
 {
-  "name": "table-detector-extension",
+  "name": "numnom-extension",
   "version": "1.0.1",
-  "description": "Browser extension that detects HTML tables on web pages",
+  "description": "Download stock price and dividend data",
   "scripts": {
     "build": "bun run build:clean && bun run build:scripts && bun run build:copy",
     "build:clean": "rm -rf dist && mkdir -p dist",
@@ -15,6 +15,7 @@
   },
   "devDependencies": {
     "@biomejs/biome": "^1.9.4",
+    "@napi-rs/canvas": "^0.1.88",
     "@types/chrome": "^0.0.277",
     "bun-types": "latest"
   },
