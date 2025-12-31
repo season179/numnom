@@ -12,7 +12,9 @@
       "WebFetch(domain:www.npmjs.com)",
       "WebFetch(domain:www.30secondsofcode.org)",
       "Bash(wc:*)",
-      "mcp__ide__getDiagnostics"
+      "mcp__ide__getDiagnostics",
+      "Skill(creating-mermaid-diagrams)",
+      "Bash(node /Users/season/.claude/skills/creating-mermaid-diagrams/scripts/validate_mermaid.js:*)"
     ]
   }
 }

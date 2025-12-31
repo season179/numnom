@@ -14,6 +14,7 @@ import {
   isIndicatorColumn,
   isPaymentDateColumn,
   normalizeTextForExcel,
+  parseDateToISO,
 } from '../shared/utils';
 
 const log = createLogger('content');
@@ -226,18 +227,18 @@ function reorderDividendRow(
 ): string[] {
   const result: string[] = [];
 
-  // Add columns in standard order
-  result.push(row[mapping.ex_date] || '');
+  // Add columns in standard order (parse date columns to YYYY-MM-DD)
+  result.push(parseDateToISO(row[mapping.ex_date] || ''));
   result.push(row[mapping.amount] || '');
 
   if (mapping.indicator !== undefined) {
     result.push(row[mapping.indicator] || '');
   }
   if (mapping.announcement_date !== undefined) {
-    result.push(row[mapping.announcement_date] || '');
+    result.push(parseDateToISO(row[mapping.announcement_date] || ''));
   }
   if (mapping.payment_date !== undefined) {
-    result.push(row[mapping.payment_date] || '');
+    result.push(parseDateToISO(row[mapping.payment_date] || ''));
   }
   if (mapping.description !== undefined) {
     result.push(row[mapping.description] || '');
