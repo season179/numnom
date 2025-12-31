@@ -1,11 +1,11 @@
 {
   "name": "numnom-extension",
-  "version": "25.12.3",
+  "version": "25.12.4",
   "description": "Download stock price and dividend data",
   "scripts": {
     "build": "bun run build:clean && bun run build:scripts && bun run build:copy",
     "build:clean": "rm -rf dist && mkdir -p dist",
-    "build:scripts": "bun build src/content/index.ts --outfile dist/content.js --target browser --define __LOG_LEVEL__='\"info\"' && bun build src/background/index.ts --outfile dist/background.js --target browser --define __LOG_LEVEL__='\"info\"' && bun build src/popup/index.ts --outfile dist/popup.js --target browser --define __LOG_LEVEL__='\"info\"'",
+    "build:scripts": "bun build src/content/index.ts --outfile dist/content.js --target browser --minify --define __LOG_LEVEL__='\"info\"' && bun build src/background/index.ts --outfile dist/background.js --target browser --minify --define __LOG_LEVEL__='\"info\"' && bun build src/popup/index.ts --outfile dist/popup.js --target browser --minify --define __LOG_LEVEL__='\"info\"'",
     "build:copy": "cp public/manifest.json dist/ && cp public/icon.png dist/ && cp public/popup.html dist/",
     "dev": "bun run build:clean && bun run dev:scripts && bun run build:copy",
     "dev:scripts": "bun build src/content/index.ts --outfile dist/content.js --target browser --define __LOG_LEVEL__='\"debug\"' && bun build src/background/index.ts --outfile dist/background.js --target browser --define __LOG_LEVEL__='\"debug\"' && bun build src/popup/index.ts --outfile dist/popup.js --target browser --define __LOG_LEVEL__='\"debug\"'",
