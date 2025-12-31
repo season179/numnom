@@ -1,6 +1,6 @@
 {
   "name": "numnom-extension",
-  "version": "25.12.5",
+  "version": "25.12.6",
   "description": "Download stock price and dividend data",
   "scripts": {
     "build": "bun run build:clean && bun run build:scripts && bun run build:copy",
