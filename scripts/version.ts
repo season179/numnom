@@ -18,12 +18,12 @@ function calculateNewVersion(currentVersion: string): string {
   const year = now.getFullYear() % 100; // 2-digit year
   const month = now.getMonth() + 1; // 1-indexed month
 
-  const [curYear, curMonth, curPatch] = currentVersion.split('.').map(Number);
+  const [curYear, curMonth, curPatch = 0] = currentVersion.split('.').map(Number);
 
   let newPatch: number;
   if (curYear === year && curMonth === month) {
     // Same month: increment patch
-    newPatch = curPatch + 1;
+    newPatch = (curPatch ?? 0) + 1;
   } else {
     // Different month: reset to 1
     newPatch = 1;
