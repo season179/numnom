@@ -1,0 +1,5 @@
+{
+  "permissions": {
+    "allow": ["Skill(canvas-design)", "Bash(bun add:*)", "Bash(bun run:*)"]
+  }
+}
