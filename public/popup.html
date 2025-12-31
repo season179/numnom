@@ -196,6 +196,60 @@
       margin: 0 6px;
       opacity: 0.5;
     }
+
+    /* Ticker input section */
+    .ticker-section {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 12px;
+      padding: 10px 12px;
+      background-color: var(--bg-card);
+      border-radius: var(--border-radius);
+      border: 1px solid var(--border-color);
+    }
+
+    .ticker-label {
+      font-size: 12px;
+      color: var(--text-secondary);
+      white-space: nowrap;
+    }
+
+    .ticker-input {
+      flex: 1;
+      background-color: var(--bg-primary);
+      border: 1px solid var(--border-color);
+      border-radius: 4px;
+      padding: 6px 10px;
+      font-family: inherit;
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--text-primary);
+      text-transform: uppercase;
+      outline: none;
+      transition: border-color 0.2s ease;
+    }
+
+    .ticker-input:focus {
+      border-color: var(--accent-dividend);
+    }
+
+    .ticker-input::placeholder {
+      color: var(--text-secondary);
+      opacity: 0.6;
+      text-transform: none;
+    }
+
+    .ticker-input.invalid {
+      border-color: var(--error);
+    }
+
+    /* Disabled download button when ticker is empty */
+    .download-btn:disabled.ticker-required {
+      background-color: #21262d;
+      cursor: not-allowed;
+      opacity: 0.5;
+    }
   </style>
 </head>
 <body>

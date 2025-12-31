@@ -18,10 +18,17 @@ const log = createLogger('popup');
 
 log.info('Script loaded');
 
+// Ticker validation regex: 1-10 alphanumeric chars with optional dots/hyphens
+const TICKER_REGEX = /^[A-Z0-9][A-Z0-9.\-]{0,9}$/i;
+
+function isValidTicker(ticker: string): boolean {
+  return ticker.length > 0 && TICKER_REGEX.test(ticker);
+}
+
 // State for tracking full downloads
 let currentDownloadIndex: number | null = null;
 let activeTabId: number | null = null;
-let currentTicker = 'unknown';
+let currentTicker = '';
 
 /**
  * Triggers a download of the CSV file
@@ -32,9 +39,10 @@ function downloadCSV(csvData: string, tableType: TableType, ticker: string): voi
   const link = document.createElement('a');
   link.href = url;
 
+  // New format: {TICKER}_{type}_{YYYY-MM-DD}.csv
   const dateStr = formatDateForFilename(new Date());
-  const typeStr = tableType === 'price' ? 'heikin-ashi' : 'dividend';
-  link.download = `${dateStr}-${ticker}-${typeStr}.csv`;
+  const typeStr = tableType === 'price' ? 'price' : 'dividend';
+  link.download = `${ticker}_${typeStr}_${dateStr}.csv`;
 
   link.click();
   URL.revokeObjectURL(url);
@@ -137,6 +145,92 @@ async function cancelDownload(): Promise<void> {
 }
 
 /**
+ * Renders the ticker input section above the table list
+ */
+function renderTickerSection(ticker: string): void {
+  // Remove existing ticker section if any
+  const existingSection = document.getElementById('ticker-section');
+  if (existingSection) {
+    existingSection.remove();
+  }
+
+  const content = document.getElementById('content');
+  if (!content) return;
+
+  const section = document.createElement('div');
+  section.id = 'ticker-section';
+  section.className = 'ticker-section';
+  section.innerHTML = `
+    <span class="ticker-label">Ticker:</span>
+    <input
+      type="text"
+      id="ticker-input"
+      class="ticker-input"
+      value="${ticker}"
+      placeholder="e.g., AAPL"
+      maxlength="10"
+      autocomplete="off"
+      spellcheck="false"
+    >
+  `;
+
+  // Insert before content
+  content.parentNode?.insertBefore(section, content);
+
+  // Attach input listener
+  const input = document.getElementById('ticker-input') as HTMLInputElement;
+  input?.addEventListener('input', handleTickerInput);
+}
+
+/**
+ * Handles ticker input changes
+ */
+function handleTickerInput(e: Event): void {
+  const input = e.target as HTMLInputElement;
+  const value = input.value.toUpperCase();
+
+  // Update input value to uppercase
+  input.value = value;
+
+  // Update state
+  currentTicker = value;
+
+  // Validate and update UI
+  const valid = isValidTicker(value);
+  input.classList.toggle('invalid', value.length > 0 && !valid);
+
+  // Enable/disable all download buttons based on ticker validity
+  updateDownloadButtons();
+}
+
+/**
+ * Updates download button states based on ticker validity
+ */
+function updateDownloadButtons(): void {
+  const buttons = document.querySelectorAll('.download-btn');
+  const valid = isValidTicker(currentTicker);
+
+  for (const btn of buttons) {
+    const button = btn as HTMLButtonElement;
+    // Don't interfere with buttons in downloading state
+    if (!button.classList.contains('downloading')) {
+      button.disabled = !valid;
+      button.classList.toggle('ticker-required', !valid);
+    }
+  }
+}
+
+/**
+ * Removes the ticker section from DOM
+ */
+function removeTickerSection(): void {
+  const tickerSection = document.getElementById('ticker-section');
+  if (tickerSection) {
+    tickerSection.remove();
+  }
+}
+
+/**
  * Renders the list of tables
  */
 function renderTables(tables: TablesResponse['tables']): void {
@@ -145,6 +239,8 @@ function renderTables(tables: TablesResponse['tables']): void {
   if (!content) return;
 
   if (tables.length === 0) {
+    // Remove ticker section if no tables
+    removeTickerSection();
     content.innerHTML = `
       <div class="status empty">
         No price or dividend tables found on this page.
@@ -199,6 +295,9 @@ function renderTables(tables: TablesResponse['tables']): void {
       startFullDownload(index);
     });
   }
+
+  // Update button states based on ticker validity
+  updateDownloadButtons();
 }
 
 /**
@@ -230,9 +329,18 @@ async function fetchTables(): Promise<void> {
     log.debug('Sending getTables message', { tabId: tab.id });
     const message: GetTablesMessage = { action: 'getTables' };
     const response = (await chrome.tabs.sendMessage(tab.id, message)) as TablesResponse;
-    log.debug('Received response', { tableCount: response.tables.length, ticker: response.ticker });
+    log.debug('Received response', {
+      tableCount: response.tables.length,
+      ticker: response.ticker,
+      tickerSource: response.tickerSource,
+    });
 
-    currentTicker = response.ticker;
+    // Only show ticker section if tables were found
+    if (response.tables.length > 0) {
+      currentTicker = response.ticker;
+      renderTickerSection(response.ticker);
+    }
+
     renderTables(response.tables);
   } catch (err) {
     log.error('Error fetching tables', err);

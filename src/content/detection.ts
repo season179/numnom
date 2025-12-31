@@ -16,44 +16,9 @@ import {
   normalizeTextForExcel,
   parseDateToISO,
 } from '../shared/utils';
+import { extractStockTicker } from './ticker';
 
 const log = createLogger('content');
-
-/**
- * Extracts stock ticker from the TradingView page
- */
-export function extractStockTicker(): string {
-  // Try to extract from URL first
-  const urlParams = new URLSearchParams(window.location.search);
-  const symbolParam = urlParams.get('symbol');
-  if (symbolParam) {
-    return symbolParam.split(':').pop()?.toLowerCase() || 'unknown';
-  }
-
-  // Try to extract from page title
-  const titleMatch = document.title.match(/([A-Z0-9]+)/);
-  if (titleMatch?.[1]) {
-    return titleMatch[1].toLowerCase();
-  }
-
-  // Try to find ticker in chart header or other elements
-  const tickerElement = document.querySelector('[data-name="legend-source-title"]');
-  if (tickerElement?.textContent) {
-    const text = tickerElement.textContent.trim();
-    const match = text.match(/([A-Z0-9]+)/);
-    if (match?.[1]) {
-      return match[1].toLowerCase();
-    }
-  }
-
-  // Fallback to hostname parsing
-  const pathMatch = window.location.pathname.match(/\/symbols?\/([^\/]+)/);
-  if (pathMatch?.[1]) {
-    return pathMatch[1].toLowerCase();
-  }
-
-  return 'unknown';
-}
 
 /**
  * Checks if a table has both "open" and "close" columns
@@ -367,9 +332,15 @@ export function getValidTables(): TablesResponse {
     };
   });
 
-  const ticker = extractStockTicker();
-  log.debug('Extracted ticker', { ticker });
-  return { tables, ticker };
+  // Only extract ticker if tables were found
+  if (tables.length > 0) {
+    const { ticker, source } = extractStockTicker();
+    log.debug('Extracted ticker', { ticker, source });
+    return { tables, ticker, tickerSource: source };
+  }
+
+  // No tables found, return empty ticker
+  return { tables, ticker: '', tickerSource: 'none' };
 }
 
 /**

@@ -9,6 +9,9 @@ export type TableType = 'price' | 'dividend';
 // Download status values
 export type DownloadStatus = 'scrolling' | 'complete' | 'error' | 'cancelled';
 
+// Source of ticker extraction (for debugging/logging)
+export type TickerSource = 'json-ld' | 'meta-og' | 'meta-twitter' | 'url-pattern' | 'none';
+
 // Message from content script to background (badge updates)
 export interface TableCountMessage {
   action: 'updateBadge';
@@ -54,6 +57,7 @@ export interface TableInfo {
 export interface TablesResponse {
   tables: TableInfo[];
   ticker: string;
+  tickerSource: TickerSource;
 }
 
 // Union type for messages content script receives

@@ -58,7 +58,7 @@ chrome.runtime.onMessage.addListener(
         sendResponse(response);
       } catch (err) {
         log.error('Error processing getTables', err);
-        sendResponse({ tables: [], ticker: 'unknown' });
+        sendResponse({ tables: [], ticker: '', tickerSource: 'none' });
       }
     } else if (message.action === 'startFullDownload') {
       log.debug('Processing startFullDownload request');
