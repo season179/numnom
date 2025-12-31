@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "NumNom",
-  "version": "25.12.4",
+  "version": "25.12.5",
   "description": "Download stock price and dividend data",
   "icons": {
     "16": "icon.png",
