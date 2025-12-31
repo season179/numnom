@@ -102,35 +102,73 @@ function hasOpenAndCloseColumns(table: HTMLTableElement): boolean {
 }
 
 /**
- * Checks if a table has dividend columns:
- * Announced, Financial Year, Subject, EX Date, Payment Date, Amount, Indicator
+ * Tokenizes a string by normalizing and splitting into words
+ * Handles: spaces, hyphens, underscores, and camelCase
+ * "Ex-Dividend Date" → Set{"ex", "dividend", "date"}
+ * "ExDate" → Set{"ex", "date"}
+ */
+function tokenize(str: string): Set<string> {
+  return new Set(
+    str
+      // Insert space before uppercase letters (camelCase splitting)
+      .replace(/([a-z])([A-Z])/g, '$1 $2')
+      .toLowerCase()
+      .replace(/[-_]/g, ' ')
+      .split(/\s+/)
+      .filter(Boolean)
+  );
+}
+
+/**
+ * Checks if a column name contains required tokens
+ * @param columnName - The column header text
+ * @param allRequired - Tokens that ALL must be present
+ * @param anyRequired - Tokens where AT LEAST ONE must be present (if non-empty)
+ */
+function matchesColumnPattern(
+  columnName: string,
+  allRequired: string[],
+  anyRequired: string[] = []
+): boolean {
+  const tokens = tokenize(columnName);
+  const hasAllRequired = allRequired.every((t) => tokens.has(t));
+  const hasAnyRequired = anyRequired.length === 0 || anyRequired.some((t) => tokens.has(t));
+  return hasAllRequired && hasAnyRequired;
+}
+
+/**
+ * Matches ex-dividend date column variations:
+ * "Ex Date", "ex-date", "Ex Dividend Date", "ExDate"
+ * Rule: must have "ex" AND ("date" OR "dividend")
+ */
+function isExDividendDateColumn(columnName: string): boolean {
+  return matchesColumnPattern(columnName, ['ex'], ['date', 'dividend']);
+}
+
+/**
+ * Matches dividend amount column variations:
+ * "Amount", "Dividend", "Dividend Amount", "Div Amount"
+ * Rule: must have "amount" OR "dividend"
+ */
+function isDividendAmountColumn(columnName: string): boolean {
+  return matchesColumnPattern(columnName, [], ['amount', 'dividend']);
+}
+
+/**
+ * Checks if a table has dividend columns (ex-dividend date and amount)
  */
 function hasDividendColumns(table: HTMLTableElement): boolean {
-  // Get all header cells from thead or first row
   const headerCells = Array.from(
     table.querySelectorAll('thead th, thead td, tr:first-child th, tr:first-child td')
   );
 
-  // Extract text content and normalize to lowercase
-  const columnNames = headerCells.map((cell) => cell.textContent?.trim().toLowerCase() || '');
+  const columnNames = headerCells.map((cell) => cell.textContent?.trim() || '');
 
-  // Check for key dividend columns (at least 4 of the 7)
-  const requiredColumns = [
-    'announced',
-    'financial year',
-    'subject',
-    'ex date',
-    'payment date',
-    'amount',
-    'indicator',
-  ];
+  // Both columns must be present
+  const hasExDate = columnNames.some(isExDividendDateColumn);
+  const hasAmount = columnNames.some(isDividendAmountColumn);
 
-  const matchCount = requiredColumns.filter((required) =>
-    columnNames.some((name) => name === required)
-  ).length;
-
-  // Consider it a dividend table if at least 4 of the 7 columns are present
-  return matchCount >= 4;
+  return hasExDate && hasAmount;
 }
 
 /**
@@ -195,10 +233,8 @@ function cleanDividendData(data: string[][]): string[][] {
   const filteredHeader = columnsToKeep.map((i) => headerRow[i] || '');
   const filteredRows = dataRows.map((row) => columnsToKeep.map((i) => row[i] || ''));
 
-  // Step 3: Find "Amount" column index in filtered data
-  const amountIndex = filteredHeader.findIndex(
-    (header) => header.toLowerCase().trim() === 'amount'
-  );
+  // Step 3: Find dividend amount column index in filtered data
+  const amountIndex = filteredHeader.findIndex((header) => isDividendAmountColumn(header));
 
   // Step 4: Remove rows without amount values
   let cleanedRows = filteredRows;
