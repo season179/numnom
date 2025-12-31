@@ -1,6 +1,6 @@
 {
   "name": "numnom-extension",
-  "version": "1.0.1",
+  "version": "25.12.1",
   "description": "Download stock price and dividend data",
   "scripts": {
     "build": "bun run build:clean && bun run build:scripts && bun run build:copy",
@@ -11,7 +11,8 @@
     "lint": "biome check .",
     "lint:fix": "biome check --write .",
     "format": "biome format --write .",
-    "check": "biome check --write . && bun run build"
+    "check": "biome check --write . && bun run build",
+    "version": "bun scripts/version.ts"
   },
   "devDependencies": {
     "@biomejs/biome": "^1.9.4",
