@@ -9,6 +9,12 @@
     "ignoreUnknown": false,
     "ignore": ["dist", "node_modules", ".git"]
   },
+  "overrides": [
+    {
+      "include": ["public/manifest.json"],
+      "formatter": { "enabled": false }
+    }
+  ],
   "formatter": {
     "enabled": true,
     "indentStyle": "space",
