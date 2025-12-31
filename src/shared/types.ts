@@ -10,7 +10,13 @@ export type TableType = 'price' | 'dividend';
 export type DownloadStatus = 'scrolling' | 'complete' | 'error' | 'cancelled';
 
 // Source of ticker extraction (for debugging/logging)
-export type TickerSource = 'json-ld' | 'meta-og' | 'meta-twitter' | 'url-pattern' | 'none';
+export type TickerSource =
+  | 'json-ld'
+  | 'meta-og'
+  | 'meta-twitter'
+  | 'url-pattern'
+  | 'table-header'
+  | 'none';
 
 // Message from content script to background (badge updates)
 export interface TableCountMessage {
@@ -51,6 +57,7 @@ export interface TableInfo {
   columns: number;
   csvData: string;
   type: TableType;
+  timeframe?: string; // e.g., "1M", "1D", "1W" (for price tables)
 }
 
 // Response from content script to popup (table data)

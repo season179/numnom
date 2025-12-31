@@ -33,16 +33,22 @@ let currentTicker = '';
 /**
  * Triggers a download of the CSV file
  */
-function downloadCSV(csvData: string, tableType: TableType, ticker: string): void {
+function downloadCSV(
+  csvData: string,
+  tableType: TableType,
+  ticker: string,
+  timeframe?: string
+): void {
   const blob = new Blob([csvData], { type: 'text/csv;charset=utf-8;' });
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
   link.href = url;
 
-  // New format: {TICKER}_{type}_{YYYY-MM-DD}.csv
+  // Format: {TICKER}_{type}[_{timeframe}]_{YYYY-MM-DD}.csv
   const dateStr = formatDateForFilename(new Date());
   const typeStr = tableType === 'price' ? 'price' : 'dividend';
-  link.download = `${ticker}_${typeStr}_${dateStr}.csv`;
+  const timeframePart = timeframe ? `_${timeframe}` : '';
+  link.download = `${ticker}_${typeStr}${timeframePart}_${dateStr}.csv`;
 
   link.click();
   URL.revokeObjectURL(url);
@@ -252,6 +258,7 @@ function renderTables(tables: TablesResponse['tables']): void {
   const tableListHTML = tables
     .map((table) => {
       const typeLabel = table.type === 'price' ? 'Price' : 'Dividend';
+      const timeframeAttr = table.timeframe ? ` data-timeframe="${table.timeframe}"` : '';
       return `
     <div class="table-item" data-type="${table.type}">
       <div class="table-info">
@@ -261,7 +268,7 @@ function renderTables(tables: TablesResponse['tables']): void {
         </div>
         <div class="table-meta">${table.rows} rows × ${table.columns} cols</div>
       </div>
-      <button class="download-btn" id="download-${table.index}" data-index="${table.index}" data-type="${table.type}">
+      <button class="download-btn" id="download-${table.index}" data-index="${table.index}" data-type="${table.type}"${timeframeAttr}>
         <div class="progress-fill"></div>
         <span class="btn-text">Download</span>
       </button>
@@ -359,12 +366,13 @@ chrome.runtime.onMessage.addListener((message: ProgressUpdate) => {
       updateProgress(currentDownloadIndex, message.progress, message.rowsCollected, message.status);
 
       if (message.status === 'complete' && message.csvData) {
-        // Get the table type from the download button's data attribute
+        // Get the table type and timeframe from the download button's data attributes
         const downloadBtn = document.getElementById(
           `download-${currentDownloadIndex}`
         ) as HTMLButtonElement;
         const tableType: TableType = (downloadBtn?.dataset.type as TableType) || 'price';
-        downloadCSV(message.csvData, tableType, currentTicker);
+        const timeframe = downloadBtn?.dataset.timeframe;
+        downloadCSV(message.csvData, tableType, currentTicker, timeframe);
         currentDownloadIndex = null;
       } else if (message.status === 'error') {
         showError(message.error || 'An error occurred during download');

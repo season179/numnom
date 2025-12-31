@@ -107,8 +107,68 @@ function extractFromMetaTags(): { ticker: string; source: 'meta-og' | 'meta-twit
   return null;
 }
 
+// Common stock exchange identifiers
+const EXCHANGES = [
+  'NASDAQ',
+  'NYSE',
+  'NYSEARCA',
+  'AMEX',
+  'ARCA',
+  'BATS',
+  'TSX',
+  'LSE',
+  'ASX',
+  'HKEX',
+  'SSE',
+  'SZSE',
+  'JPX',
+  'KRX',
+  'NSE',
+  'BSE',
+];
+
 /**
- * Signal 3: Extract ticker from URL patterns
+ * Signal 3: Extract ticker from table headers
+ * Looks for pattern: "TICKER   EXCHANGE" (e.g., "GOOG   NASDAQ")
+ */
+function extractFromTableHeader(): string | null {
+  const tables = document.querySelectorAll('table');
+
+  // Build regex pattern for "TICKER   EXCHANGE" format
+  const exchangePattern = EXCHANGES.join('|');
+  // Match: {TICKER} {multiple spaces or separators} {EXCHANGE}
+  const pattern = new RegExp(
+    `^([A-Z0-9][A-Z0-9.\\-]{0,9})\\s+(?:·\\s*)?(${exchangePattern})$`,
+    'i'
+  );
+
+  for (const table of tables) {
+    // Check first 3 rows for header content
+    const rows = Array.from(table.querySelectorAll('tr')).slice(0, 3);
+
+    for (const row of rows) {
+      const cells = Array.from(row.querySelectorAll('th, td'));
+
+      for (const cell of cells) {
+        const text = cell.textContent?.trim() || '';
+        const match = text.match(pattern);
+
+        if (match?.[1]) {
+          const ticker = match[1].toUpperCase();
+          if (isValidTicker(ticker)) {
+            log.debug('Found ticker in table header', { text, ticker, exchange: match[2] });
+            return ticker;
+          }
+        }
+      }
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Signal 4: Extract ticker from URL patterns
  * Generic patterns that work across financial sites
  */
 function extractFromUrl(): string | null {
@@ -144,7 +204,7 @@ function extractFromUrl(): string | null {
 
 /**
  * Extracts stock ticker using multi-signal approach
- * Priority: JSON-LD > Meta tags > URL patterns > empty string
+ * Priority: JSON-LD > Meta tags > Table headers > URL patterns > empty string
  */
 export function extractStockTicker(): TickerResult {
   // Signal 1: JSON-LD structured data
@@ -159,7 +219,13 @@ export function extractStockTicker(): TickerResult {
     return { ticker: metaResult.ticker, source: metaResult.source };
   }
 
-  // Signal 3: URL patterns
+  // Signal 3: Table headers (e.g., "GOOG   NASDAQ")
+  const tableTicker = extractFromTableHeader();
+  if (tableTicker) {
+    return { ticker: tableTicker, source: 'table-header' };
+  }
+
+  // Signal 4: URL patterns
   const urlTicker = extractFromUrl();
   if (urlTicker) {
     return { ticker: urlTicker, source: 'url-pattern' };

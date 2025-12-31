@@ -7,9 +7,11 @@ import Papa from 'papaparse';
 import { createLogger } from '../shared/logger';
 import type { TableCountMessage, TableType, TablesResponse } from '../shared/types';
 import {
+  extractTimeframe,
   isAmountColumn,
   isAnnouncementDateColumn,
   isCloseColumn,
+  isDateColumn,
   isDescriptionColumn,
   isExDateColumn,
   isHighColumn,
@@ -320,6 +322,229 @@ export function cleanDividendData(data: string[][]): string[][] {
   return [standardHeader, ...standardizedRows];
 }
 
+// ============================================================================
+// Price Column Standardization
+// Reorders columns to: date, open, high, low, close, extras (JSON for unmatched)
+// ============================================================================
+
+/** Standard price column names in output order */
+const PRICE_COLUMNS = ['date', 'open', 'high', 'low', 'close'] as const;
+
+type PriceColumnName = (typeof PRICE_COLUMNS)[number];
+
+/** Maps standard column names to their source column index */
+interface PriceColumnMapping {
+  date: number; // required
+  open: number; // required
+  high: number; // required
+  low: number; // required
+  close: number; // required
+  extras: number[]; // indexes of unmatched columns
+}
+
+/** Column matchers for price tables */
+const PRICE_COLUMN_MATCHERS: { name: PriceColumnName; matcher: (name: string) => boolean }[] = [
+  { name: 'date', matcher: isDateColumn },
+  { name: 'open', matcher: isOpenColumn },
+  { name: 'high', matcher: isHighColumn },
+  { name: 'low', matcher: isLowColumn },
+  { name: 'close', matcher: isCloseColumn },
+];
+
+/**
+ * Maps source column headers to standard price columns using priority-based claiming.
+ */
+function mapPriceColumns(headers: string[]): Partial<PriceColumnMapping> {
+  const claimed = new Set<number>();
+  const mapping: Partial<PriceColumnMapping> = { extras: [] };
+
+  // Process each target column in priority order
+  for (const { name, matcher } of PRICE_COLUMN_MATCHERS) {
+    for (let i = 0; i < headers.length; i++) {
+      if (!claimed.has(i) && matcher(headers[i] || '')) {
+        mapping[name] = i;
+        claimed.add(i);
+        break;
+      }
+    }
+  }
+
+  // All unclaimed columns go to extras
+  mapping.extras = headers.map((_, i) => i).filter((i) => !claimed.has(i));
+
+  return mapping;
+}
+
+/**
+ * Checks if a mapping has all required OHLC columns (not including date).
+ */
+function hasRequiredOHLCColumns(mapping: Partial<PriceColumnMapping>): boolean {
+  return (
+    mapping.open !== undefined &&
+    mapping.high !== undefined &&
+    mapping.low !== undefined &&
+    mapping.close !== undefined
+  );
+}
+
+/**
+ * Finds the header row that contains OHLC columns.
+ * Tables may have multi-row headers where OHLC columns are in a different row than row 0.
+ */
+function findOHLCHeaderRow(
+  data: string[][]
+): { headerRowIndex: number; mapping: Partial<PriceColumnMapping> } | null {
+  const maxHeaderRows = Math.min(5, data.length);
+
+  for (let i = 0; i < maxHeaderRows; i++) {
+    const row = data[i];
+    if (!row) continue;
+
+    const mapping = mapPriceColumns(row);
+    if (hasRequiredOHLCColumns(mapping)) {
+      return { headerRowIndex: i, mapping };
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Builds the standardized header row for price data based on which columns are present.
+ */
+function buildPriceHeader(mapping: PriceColumnMapping): string[] {
+  const header: string[] = ['date', 'open', 'high', 'low', 'close'];
+  if (mapping.extras.length > 0) header.push('extras');
+  return header;
+}
+
+/** Result from cleaning price data, includes timeframe if detected */
+export interface CleanPriceDataResult {
+  data: string[][];
+  timeframe: string | null;
+}
+
+/**
+ * Cleans price table data by:
+ * 1. Standardizing column order and names (date, open, high, low, close)
+ * 2. Parsing date column to YYYY-MM-DD format
+ * 3. Converting unmatched columns to JSON extras
+ * 4. Extracting timeframe from header rows
+ *
+ * Handles multi-row headers with colspan where:
+ * - Header row may have fewer columns than data rows
+ * - OHLC column names may be in a different row than the date column
+ */
+export function cleanPriceData(data: string[][]): CleanPriceDataResult {
+  if (data.length === 0) return { data, timeframe: null };
+
+  // Find the header row with OHLC columns (may not be row 0)
+  const headerInfo = findOHLCHeaderRow(data);
+  if (!headerInfo) {
+    return { data, timeframe: null };
+  }
+
+  const { headerRowIndex, mapping } = headerInfo;
+  const headerRow = data[headerRowIndex];
+  if (!headerRow) return { data, timeframe: null };
+
+  // Data rows start after the header row
+  const dataRows = data.slice(headerRowIndex + 1);
+  if (dataRows.length === 0) return { data, timeframe: null };
+
+  // Calculate column offset: data may have more columns than header (due to colspan)
+  const dataColumnCount = dataRows[0]?.length || 0;
+  const headerColumnCount = headerRow.length;
+  const columnOffset = Math.max(0, dataColumnCount - headerColumnCount);
+
+  // Build final mapping with offset applied
+  // If header doesn't have date column but has offset, assume data column 0 is date
+  const finalMapping: PriceColumnMapping = {
+    date: mapping.date !== undefined ? mapping.date + columnOffset : 0,
+    open: (mapping.open ?? 0) + columnOffset,
+    high: (mapping.high ?? 1) + columnOffset,
+    low: (mapping.low ?? 2) + columnOffset,
+    close: (mapping.close ?? 3) + columnOffset,
+    extras: (mapping.extras || []).map((i) => i + columnOffset),
+  };
+
+  // If date column was inferred (not from header), add remaining pre-offset columns to extras
+  if (mapping.date === undefined && columnOffset > 0) {
+    // Column 0 is date, so extras should include indices 1 to columnOffset-1 (if any)
+    // But typically columnOffset=1 means only column 0 is extra (date), nothing else to add
+  }
+
+  // Extract timeframe from any header row (search rows 0 to headerRowIndex)
+  let timeframe: string | null = null;
+  for (let i = 0; i <= headerRowIndex && !timeframe; i++) {
+    const row = data[i];
+    if (!row) continue;
+    for (const cell of row) {
+      const tf = extractTimeframe(cell);
+      if (tf) {
+        timeframe = tf;
+        break;
+      }
+    }
+  }
+
+  // Build headers for extras (using original header row, with offset)
+  const extrasHeaders: string[] = [];
+  for (const idx of finalMapping.extras) {
+    // Map back to header index if possible
+    const headerIdx = idx - columnOffset;
+    if (headerIdx >= 0 && headerIdx < headerRow.length) {
+      extrasHeaders.push(headerRow[headerIdx] || `col_${idx}`);
+    } else {
+      extrasHeaders.push(`col_${idx}`);
+    }
+  }
+
+  const includeExtras = finalMapping.extras.length > 0;
+
+  // Build standardized header
+  const standardHeader = buildPriceHeader(finalMapping);
+
+  // Reorder data rows
+  const standardizedRows = dataRows
+    .filter((row) => {
+      // Remove rows without valid date values
+      const dateValue = row[finalMapping.date]?.trim();
+      return dateValue !== '' && dateValue !== '-';
+    })
+    .map((row) => {
+      const result: string[] = [];
+
+      // Add columns in standard order (parse date column to YYYY-MM-DD)
+      result.push(parseDateToISO(row[finalMapping.date] || ''));
+      result.push(row[finalMapping.open] || '');
+      result.push(row[finalMapping.high] || '');
+      result.push(row[finalMapping.low] || '');
+      result.push(row[finalMapping.close] || '');
+
+      // Add extras JSON if there are unmatched columns
+      if (includeExtras) {
+        const extras: Record<string, string> = {};
+        for (let i = 0; i < finalMapping.extras.length; i++) {
+          const dataIdx = finalMapping.extras[i];
+          const key = toSnakeCase(extrasHeaders[i] || `col_${dataIdx}`);
+          const value = row[dataIdx ?? 0] || '';
+          if (key && value) {
+            extras[key] = value;
+          }
+        }
+        result.push(Object.keys(extras).length > 0 ? JSON.stringify(extras) : '');
+      }
+
+      return result;
+    });
+
+  return {
+    data: [standardHeader, ...standardizedRows],
+    timeframe,
+  };
+}
+
 /**
  * Gets all valid tables and converts them to CSV format
  */
@@ -346,9 +571,15 @@ export function getValidTables(): TablesResponse {
     // Filter out completely empty rows
     data = data.filter((row) => row.some((cell) => cell !== ''));
 
-    // Apply dividend-specific cleaning
+    let timeframe: string | null = null;
+
+    // Apply type-specific cleaning
     if (type === 'dividend') {
       data = cleanDividendData(data);
+    } else if (type === 'price') {
+      const result = cleanPriceData(data);
+      data = result.data;
+      timeframe = result.timeframe;
     }
 
     const csvData = Papa.unparse(data, {
@@ -357,7 +588,7 @@ export function getValidTables(): TablesResponse {
     });
     const rows = data.length;
     const columns = data[0]?.length || 0;
-    log.debug('Table processed', { index: index + 1, type, rows, columns });
+    log.debug('Table processed', { index: index + 1, type, rows, columns, timeframe });
 
     return {
       index,
@@ -365,6 +596,7 @@ export function getValidTables(): TablesResponse {
       columns,
       csvData,
       type,
+      ...(timeframe && { timeframe }),
     };
   });
 

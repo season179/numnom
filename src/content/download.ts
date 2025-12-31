@@ -16,7 +16,7 @@ import {
 import { createLogger } from '../shared/logger';
 import type { ProgressUpdate } from '../shared/types';
 import { hashRow } from '../shared/utils';
-import { cleanDividendData, getTableType, tableToArray } from './detection';
+import { cleanDividendData, cleanPriceData, getTableType, tableToArray } from './detection';
 
 const log = createLogger('content');
 
@@ -206,9 +206,12 @@ export async function handleFullDownload(tableIndex: number): Promise<void> {
     // Filter out completely empty rows
     let filteredRows = allRows.filter((row) => row.some((cell) => cell !== ''));
 
-    // Apply dividend-specific cleaning
+    // Apply type-specific cleaning
     if (tableType === 'dividend') {
       filteredRows = cleanDividendData(filteredRows);
+    } else if (tableType === 'price') {
+      const result = cleanPriceData(filteredRows);
+      filteredRows = result.data;
     }
 
     // Generate CSV from all collected rows

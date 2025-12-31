@@ -133,6 +133,14 @@ export function isLowColumn(name: string): boolean {
 }
 
 /**
+ * Matches date column for price tables.
+ * Examples: "Date", "Trade Date", "Date · 1M"
+ */
+export function isDateColumn(name: string): boolean {
+  return tokenize(name).has('date');
+}
+
+/**
  * Normalizes text for Excel compatibility.
  * - Replaces Unicode minus (U+2212) with ASCII hyphen-minus (U+002D)
  * - Replaces middle dot (U+00B7) with space
@@ -233,6 +241,28 @@ export function parseDateToISO(dateStr: string): string {
     }
   }
 
+  // Try text format with 2-digit year: "Mon 01 Dec '25" or "01 Dec '25"
+  const textMatch3 = trimmed.match(/^(?:[a-z]{3}\s+)?(\d{1,2})\s+([a-z]+)\s+'(\d{2})$/i);
+  if (textMatch3?.[1] && textMatch3[2] && textMatch3[3]) {
+    const month = MONTH_NAMES[textMatch3[2].toLowerCase()];
+    if (month) {
+      const year = twoDigitYearToFour(+textMatch3[3]);
+      const date = createValidDate(year, month, +textMatch3[1]);
+      if (date) return formatToISO(date);
+    }
+  }
+
+  // Try text format with 2-digit year: "Dec 01, '25" or "December 01 '25"
+  const textMatch4 = trimmed.match(/^([a-z]+)\s+(\d{1,2}),?\s+'(\d{2})$/i);
+  if (textMatch4?.[1] && textMatch4[2] && textMatch4[3]) {
+    const month = MONTH_NAMES[textMatch4[1].toLowerCase()];
+    if (month) {
+      const year = twoDigitYearToFour(+textMatch4[3]);
+      const date = createValidDate(year, month, +textMatch4[2]);
+      if (date) return formatToISO(date);
+    }
+  }
+
   // Try numeric format: MM/DD/YYYY or DD/MM/YYYY
   const numericMatch = trimmed.match(/^(\d{1,2})[/.](\d{1,2})[/.](\d{4})$/);
   if (numericMatch?.[1] && numericMatch[2] && numericMatch[3]) {
@@ -251,6 +281,14 @@ export function parseDateToISO(dateStr: string): string {
   }
 
   return 'INVALID_DATE';
+}
+
+/**
+ * Converts 2-digit year to 4-digit year using Y2K cutoff of 50.
+ * 00-49 → 2000-2049, 50-99 → 1950-1999
+ */
+function twoDigitYearToFour(twoDigitYear: number): number {
+  return twoDigitYear < 50 ? 2000 + twoDigitYear : 1900 + twoDigitYear;
 }
 
 /** Formats a Date to YYYY-MM-DD */
@@ -273,4 +311,88 @@ function createValidDate(year: number, month: number, day: number): Date | null 
     return null;
   }
   return date;
+}
+
+// ============================================================================
+// Timeframe Extraction
+// Extracts timeframe from column headers like "Date · 1M" or "Date (1D)"
+// ============================================================================
+
+/** Known timeframe patterns (case-insensitive) */
+const TIMEFRAME_PATTERNS = [
+  // Intraday
+  '1m',
+  '5m',
+  '15m',
+  '30m',
+  '1h',
+  '4h',
+  // Daily
+  '1d',
+  'daily',
+  // Weekly
+  '1w',
+  'weekly',
+  // Monthly
+  '1mo',
+  '1M',
+  'monthly',
+  // Yearly
+  '1y',
+  'yearly',
+] as const;
+
+/**
+ * Extracts timeframe from a column header string.
+ * Looks for patterns like "Date · 1M", "Date (1D)", "Date - daily"
+ *
+ * @returns Normalized timeframe string (e.g., "1M", "1D") or null if not found
+ */
+export function extractTimeframe(columnHeader: string): string | null {
+  // Remove the main column name part and look for timeframe after separators
+  // Common separators: · (middle dot), -, (, ), :, |
+  const separatorMatch = columnHeader.match(/[·\-:()|]\s*(.+)$/);
+  const searchText = separatorMatch?.[1] || columnHeader;
+
+  // Search for known timeframe patterns
+  const normalized = searchText.trim().toLowerCase();
+
+  for (const pattern of TIMEFRAME_PATTERNS) {
+    if (normalized === pattern.toLowerCase()) {
+      // Return normalized version
+      return normalizeTimeframe(pattern);
+    }
+  }
+
+  // Try regex for numeric patterns like "1M", "5m", "1D", etc.
+  const timeframeMatch = searchText.match(/\b(\d+)\s*(m|h|d|w|mo|y)\b/i);
+  if (timeframeMatch?.[1] && timeframeMatch[2]) {
+    const num = timeframeMatch[1];
+    const unit = timeframeMatch[2].toLowerCase();
+    return normalizeTimeframe(`${num}${unit}`);
+  }
+
+  return null;
+}
+
+/**
+ * Normalizes timeframe to consistent format.
+ * e.g., "daily" → "1D", "monthly" → "1M", "1mo" → "1M"
+ */
+function normalizeTimeframe(tf: string): string {
+  const lower = tf.toLowerCase();
+
+  // Word forms
+  if (lower === 'daily') return '1D';
+  if (lower === 'weekly') return '1W';
+  if (lower === 'monthly') return '1M';
+  if (lower === 'yearly') return '1Y';
+
+  // Normalize "mo" to "M" for monthly
+  if (lower.endsWith('mo')) {
+    return lower.replace('mo', 'M').toUpperCase();
+  }
+
+  // Uppercase the unit letter
+  return tf.replace(/([mhdwy])$/i, (match) => match.toUpperCase());
 }
