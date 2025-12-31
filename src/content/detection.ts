@@ -9,9 +9,13 @@ import type { TableCountMessage, TableType, TablesResponse } from '../shared/typ
 import {
   isAmountColumn,
   isAnnouncementDateColumn,
+  isCloseColumn,
   isDescriptionColumn,
   isExDateColumn,
+  isHighColumn,
   isIndicatorColumn,
+  isLowColumn,
+  isOpenColumn,
   isPaymentDateColumn,
   normalizeTextForExcel,
   parseDateToISO,
@@ -21,22 +25,54 @@ import { extractStockTicker } from './ticker';
 const log = createLogger('content');
 
 /**
- * Checks if a table has both "open" and "close" columns
+ * Extracts column names from a table row
  */
-function hasOpenAndCloseColumns(table: HTMLTableElement): boolean {
-  // Get all header cells from thead or first row
-  const headerCells = Array.from(
-    table.querySelectorAll('thead th, thead td, tr:first-child th, tr:first-child td')
-  );
+function getColumnNamesFromRow(row: Element): string[] {
+  const cells = Array.from(row.querySelectorAll('th, td'));
+  return cells.map((cell) => cell.textContent?.trim() || '');
+}
 
-  // Extract text content and normalize to lowercase
-  const columnNames = headerCells.map((cell) => cell.textContent?.trim().toLowerCase() || '');
+/**
+ * Checks if a set of column names contains all required OHLC price columns
+ */
+function hasAllPriceColumns(columnNames: string[]): boolean {
+  const hasOpen = columnNames.some(isOpenColumn);
+  const hasClose = columnNames.some(isCloseColumn);
+  const hasHigh = columnNames.some(isHighColumn);
+  const hasLow = columnNames.some(isLowColumn);
+  return hasOpen && hasClose && hasHigh && hasLow;
+}
 
-  // Check if both "open" and "close" columns exist
-  const hasOpen = columnNames.some((name) => name === 'open');
-  const hasClose = columnNames.some((name) => name === 'close');
+/**
+ * Checks if a table has all OHLC price columns (open, high, low, close)
+ * Searches all rows in thead (bottom-up), then falls back to first 5 rows
+ */
+function hasPriceColumns(table: HTMLTableElement): boolean {
+  // First, check all rows in thead (bottom-up for multi-row headers)
+  const theadRows = Array.from(table.querySelectorAll('thead tr'));
+  for (let i = theadRows.length - 1; i >= 0; i--) {
+    const row = theadRows[i];
+    if (row) {
+      const columnNames = getColumnNamesFromRow(row);
+      if (hasAllPriceColumns(columnNames)) {
+        return true;
+      }
+    }
+  }
 
-  return hasOpen && hasClose;
+  // Fallback: check first 5 rows of the table (bottom-up, for tables without thead)
+  const allRows = Array.from(table.querySelectorAll('tr')).slice(0, 5);
+  for (let i = allRows.length - 1; i >= 0; i--) {
+    const row = allRows[i];
+    if (row) {
+      const columnNames = getColumnNamesFromRow(row);
+      if (hasAllPriceColumns(columnNames)) {
+        return true;
+      }
+    }
+  }
+
+  return false;
 }
 
 /**
@@ -61,7 +97,7 @@ function hasDividendColumns(table: HTMLTableElement): boolean {
  * Determines the type of table based on its columns
  */
 export function getTableType(table: HTMLTableElement): TableType | null {
-  if (hasOpenAndCloseColumns(table)) {
+  if (hasPriceColumns(table)) {
     return 'price';
   }
   if (hasDividendColumns(table)) {

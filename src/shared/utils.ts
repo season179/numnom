@@ -95,6 +95,43 @@ export function isDescriptionColumn(name: string): boolean {
   return tokens.has('subject') || tokens.has('description');
 }
 
+// ============================================================================
+// Price Column Matchers
+// Used for detecting OHLC (Open, High, Low, Close) price tables
+// ============================================================================
+
+/**
+ * Matches open price column.
+ * Examples: "Open", "Open Price", "OpenPrice"
+ */
+export function isOpenColumn(name: string): boolean {
+  return tokenize(name).has('open');
+}
+
+/**
+ * Matches close price column.
+ * Examples: "Close", "Adj Close", "Close Price", "Closing"
+ */
+export function isCloseColumn(name: string): boolean {
+  return tokenize(name).has('close');
+}
+
+/**
+ * Matches high price column.
+ * Examples: "High", "High Price", "Day High"
+ */
+export function isHighColumn(name: string): boolean {
+  return tokenize(name).has('high');
+}
+
+/**
+ * Matches low price column.
+ * Examples: "Low", "Low Price", "Day Low", "52-week Low"
+ */
+export function isLowColumn(name: string): boolean {
+  return tokenize(name).has('low');
+}
+
 /**
  * Normalizes text for Excel compatibility.
  * - Replaces Unicode minus (U+2212) with ASCII hyphen-minus (U+002D)
