@@ -1,7 +1,7 @@
 # Full CSV Download Feature
 
 ## Problem Solved
-Many financial data tables use lazy loading/virtual scrolling - only visible rows are rendered in the DOM. The previous "Quick CSV" button only captured currently visible rows, resulting in incomplete data exports.
+Many financial data tables use lazy loading/virtual scrolling - only visible rows are rendered in the DOM. A simple export would only capture currently visible rows, resulting in incomplete data exports.
 
 ## Solution Implemented
 Added an **automated scroll & collect** feature that:
@@ -10,37 +10,44 @@ Added an **automated scroll & collect** feature that:
 3. Shows real-time progress with row count
 4. Generates complete CSV from all collected data
 
-## New Features
+## UI Features
 
-### 1. Two Download Options
-- **Quick CSV** (Blue button): Instant download of currently visible rows (old behavior)
-- **Full CSV** (Green button): Auto-scrolls to collect ALL rows before downloading
+### 1. Single Download Button
+- **Download** button auto-scrolls to collect ALL rows before downloading
+- Progress bar fills the button itself during download
+- Shows percentage, row count, and inline cancel option
 
-### 2. Progress Tracking
-- Real-time progress bar showing scroll completion (0-100%)
-- Live row count display during collection
-- Status messages: "Scrolling...", "Complete!", "Cancelled", "Error occurred"
+### 2. Progress-in-Button Pattern
+- Button transforms during download: `72% | 150 rows | Cancel`
+- Green progress fill animates inside the button
+- Click "Cancel" text to stop download
 
-### 3. Cancellation Support
-- Red "Cancel" button appears during full download
-- Stops scrolling immediately and restores UI
+### 3. Dark Terminal Theme
+- Dark background (#0d1117) with JetBrains Mono font
+- Color-coded table type indicators:
+  - Green left border = Price tables
+  - Blue left border = Dividend tables
+- Type badges with matching accent colors
 
 ## How It Works
 
 ### Technical Flow
 ```
-1. User clicks "Full CSV" button
-2. Content script finds scrollable container (table parent or window)
-3. Auto-scrolls incrementally (80% viewport height per step)
-4. Waits 300ms after each scroll for content to load
-5. Collects newly rendered rows after each scroll
-6. Deduplicates rows using content hash (Map)
-7. Stops when:
+1. User clicks "Download" button
+2. Button enters downloading state (shows progress)
+3. Content script finds scrollable container (table parent or window)
+4. Auto-scrolls incrementally (80% viewport height per step)
+5. Waits 300ms after each scroll for content to load
+6. Collects newly rendered rows after each scroll
+7. Deduplicates rows using content hash (Map)
+8. Progress updates fill the button in real-time
+9. Stops when:
    - Reaches bottom of scroll container
    - No new rows detected for 5 consecutive attempts
    - Maximum 200 scroll attempts reached (safety limit)
-   - User clicks "Cancel"
-8. Generates CSV and triggers download
+   - User clicks "Cancel" text
+10. Generates CSV and triggers download
+11. Button resets to default state
 ```
 
 ### Key Technical Details
@@ -93,45 +100,45 @@ handleFullDownload(tableIndex: number): Promise<void>
 ```
 
 ### 2. `src/popup/index.ts`
-**Added:**
-- State variables: `currentDownloadIndex`, `activeTabId`
-- `updateProgress()` - Updates UI during scrolling
-- `startFullDownload()` - Initiates full download request
-- `cancelDownload()` - Sends cancellation message
-- Message listener for `downloadProgress` updates
-- Updated `renderTables()` with two-button layout + progress UI
+**Key Functions:**
+- `updateProgress()` - Updates progress fill inside button
+- `startFullDownload()` - Initiates download and sets button to downloading state
+- `cancelDownload()` - Sends cancellation message to content script
+- `renderTables()` - Generates table cards with single download button
 
-**Key Changes:**
-- `downloadCSV()` now accepts `isFull` parameter for filename distinction
-- Button handlers for Quick/Full/Cancel actions
-- Real-time progress updates via message listener
+**Progress-in-Button Logic:**
+- Button has `.downloading` class during download
+- `.progress-fill` element width updated in real-time
+- `.btn-text` shows `72% | 150 rows | Cancel` during download
+- Click detection on `.cancel-action` span triggers cancellation
 
 ### 3. `public/popup.html`
-**Updated CSS:**
-- `.table-item` - Flex layout with gap for buttons
-- `.table-header` - Bold header styling
-- `.progress-container`, `.progress-bar`, `.progress-fill` - Progress bar styling
-- `.progress-text` - Small text for status messages
-- `.button-group` - Vertical button layout
-- `.btn-quick`, `.btn-full`, `.btn-cancel` - Color-coded buttons
+**CSS Architecture:**
+- CSS variables for consistent theming (see `:root` block)
+- `.download-btn` - Relative positioned button container
+- `.progress-fill` - Absolutely positioned progress bar inside button
+- `.btn-text` - Z-indexed text layer above progress fill
+- `.table-type-badge` - Color-coded type indicators
 
-**Visual Changes:**
-- Each table now shows header + progress area + 3 buttons (vertically stacked)
-- Progress bar is green with smooth animation
-- Buttons are color-coded: Blue (Quick), Green (Full), Red (Cancel)
+**Visual Design:**
+- Dark background (#0d1117) with card-based layout (#161b22)
+- JetBrains Mono font for terminal aesthetic
+- Color-coded left borders on table cards
+- Single full-width download button per table
 
 ## Usage Instructions
 
 ### For End Users
 1. Navigate to a page with financial tables (price tables with "open"/"close" columns, or dividend tables)
-2. Click extension icon to open popup
-3. You'll see two options per table:
-   - **Quick CSV**: Download visible rows immediately
-   - **Full CSV**: Auto-scroll and download all rows (may take 10-60 seconds depending on data size)
-4. During full download:
-   - Progress bar shows completion percentage
-   - Row count updates in real-time
-   - Click "Cancel" to stop if needed
+2. Click extension icon to open dark-themed popup
+3. Each detected table shows:
+   - Table name and type badge (Price/Dividend)
+   - Row and column count
+   - Green "Download" button
+4. Click "Download" to start auto-scroll collection:
+   - Button fills with progress (green bar)
+   - Shows: `72% | 150 rows | Cancel`
+   - Click "Cancel" text to stop if needed
 5. CSV file downloads automatically when complete
 
 ### For Developers Testing
@@ -146,11 +153,11 @@ handleFullDownload(tableIndex: number): Promise<void>
 
 3. **Test on a financial data page:**
    - Open a page with large data table
-   - Open extension popup
-   - Click "Full CSV"
-   - Watch console for debug logs (F12 → Console)
-   - Verify progress updates
-   - Verify final CSV has all rows
+   - Open extension popup (should show dark theme)
+   - Verify color-coded table badges
+   - Click "Download" button
+   - Watch progress fill the button
+   - Verify CSV has all rows
 
 4. **Console Logs to Monitor:**
    ```
@@ -164,11 +171,10 @@ handleFullDownload(tableIndex: number): Promise<void>
 ## Performance Characteristics
 
 ### Speed
-- **Quick CSV**: Instant (< 100ms)
-- **Full CSV**: Depends on data size
-  - 100 rows: ~3-5 seconds
-  - 1000 rows: ~15-30 seconds
-  - 5000+ rows: ~60+ seconds
+Download time depends on data size:
+- 100 rows: ~3-5 seconds
+- 1000 rows: ~15-30 seconds
+- 5000+ rows: ~60+ seconds
 
 ### Memory
 - Stores all unique rows in memory during collection

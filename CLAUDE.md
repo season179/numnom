@@ -59,10 +59,11 @@ Two independent flows:
 
 3. **Popup** (src/popup/index.ts + public/popup.html)
    - Opens when user clicks extension icon
-   - Requests table data from active tab's content script
-   - Displays list of detected tables with row/column counts
-   - Provides Quick CSV and Full CSV download options
-   - Shows progress during full download with cancel option
+   - Dark terminal-inspired UI with JetBrains Mono font
+   - Color-coded table indicators (green=price, blue=dividend)
+   - Single Download button with progress-in-button pattern
+   - Auto-scrolls to collect all rows from lazy-loaded tables
+   - See `docs/FULL_DOWNLOAD_FEATURE.md` for technical details
 
 ### Message Interfaces
 ```typescript
@@ -108,6 +109,6 @@ After building, load unpacked extension from `dist/` directory at chrome://exten
 To test the extension:
 1. Navigate to any page with financial tables (price or dividend data)
 2. Badge should show count of detected tables
-3. Click the extension icon to open popup
-4. Popup displays list of detected tables with type labels
-5. Use Quick CSV for visible rows or Full CSV for complete data
+3. Click the extension icon to open dark-themed popup
+4. Popup displays tables with color-coded type badges
+5. Click Download to auto-scroll and export complete data

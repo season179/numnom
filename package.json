@@ -21,7 +21,7 @@
   },
   "type": "module",
   "dependencies": {
-    "@types/papaparse": "^5.3.16",
+    "@types/papaparse": "^5.5.2",
     "papaparse": "^5.5.3"
   }
 }

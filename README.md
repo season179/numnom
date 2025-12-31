@@ -6,12 +6,10 @@ A Chrome extension that detects financial tables (price and dividend data) on we
 
 - Detects tables with price data (open/close columns) and dividend data
 - Shows a green badge with the count of detected tables
-- Quick CSV export of visible rows
-- Full CSV export with auto-scroll for lazy-loaded tables
+- CSV export with auto-scroll for lazy-loaded tables
+- Dark terminal-inspired UI
 - Updates dynamically when tables are added/removed
-- Built with TypeScript for type safety
-- Fast builds with Bun
-- Code quality enforced with Biome linter
+- Built with TypeScript, Bun, and Biome
 
 ## Prerequisites
 

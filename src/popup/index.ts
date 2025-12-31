@@ -72,7 +72,7 @@ function downloadCSV(csvData: string, tableType: TableType, ticker: string): voi
 }
 
 /**
- * Updates progress UI for a specific table
+ * Updates progress UI for a specific table - progress integrated into button
  */
 function updateProgress(
   index: number,
@@ -80,31 +80,48 @@ function updateProgress(
   rowsCollected: number,
   status: string
 ): void {
-  const progressBar = document.getElementById(`progress-${index}`);
-  const progressText = document.getElementById(`progress-text-${index}`);
-  const cancelBtn = document.getElementById(`cancel-${index}`) as HTMLButtonElement;
+  const downloadBtn = document.getElementById(`download-${index}`) as HTMLButtonElement;
+  if (!downloadBtn) return;
 
-  if (progressBar && progressText) {
-    progressBar.style.display = 'block';
-    const fill = progressBar.querySelector('.progress-fill') as HTMLElement;
-    if (fill) {
-      fill.style.width = `${progress}%`;
+  const progressFill = downloadBtn.querySelector('.progress-fill') as HTMLElement;
+  const btnText = downloadBtn.querySelector('.btn-text') as HTMLElement;
+
+  if (status === 'scrolling') {
+    downloadBtn.classList.add('downloading');
+    downloadBtn.disabled = true;
+
+    if (progressFill) {
+      progressFill.style.width = `${progress}%`;
     }
 
-    if (status === 'scrolling') {
-      progressText.textContent = `Scrolling... ${progress}% (${rowsCollected} rows)`;
-    } else if (status === 'complete') {
-      progressText.textContent = `Complete! ${rowsCollected} rows collected`;
-      progressBar.style.display = 'none';
-      if (cancelBtn) cancelBtn.style.display = 'none';
-    } else if (status === 'error') {
-      progressText.textContent = 'Error occurred';
-      progressBar.style.display = 'none';
-      if (cancelBtn) cancelBtn.style.display = 'none';
-    } else if (status === 'cancelled') {
-      progressText.textContent = 'Cancelled';
-      progressBar.style.display = 'none';
-      if (cancelBtn) cancelBtn.style.display = 'none';
+    if (btnText) {
+      btnText.innerHTML = `${progress}%<span class="separator">|</span>${rowsCollected} rows<span class="separator">|</span><span class="cancel-action">Cancel</span>`;
+    }
+  } else if (status === 'complete') {
+    downloadBtn.classList.remove('downloading');
+    downloadBtn.disabled = false;
+
+    if (progressFill) {
+      progressFill.style.width = '0%';
+    }
+
+    if (btnText) {
+      btnText.textContent = 'Download';
+    }
+  } else if (status === 'error' || status === 'cancelled') {
+    downloadBtn.classList.remove('downloading');
+    downloadBtn.disabled = false;
+
+    if (progressFill) {
+      progressFill.style.width = '0%';
+    }
+
+    if (btnText) {
+      btnText.textContent = status === 'cancelled' ? 'Cancelled' : 'Error';
+      // Reset to "Download" after 2 seconds
+      setTimeout(() => {
+        if (btnText) btnText.textContent = 'Download';
+      }, 2000);
     }
   }
 }
@@ -117,14 +134,16 @@ async function startFullDownload(index: number): Promise<void> {
 
   currentDownloadIndex = index;
 
-  // Show progress UI
-  const fullBtn = document.getElementById(`full-${index}`) as HTMLButtonElement;
-  const cancelBtn = document.getElementById(`cancel-${index}`) as HTMLButtonElement;
-
-  if (fullBtn) fullBtn.disabled = true;
-  if (cancelBtn) cancelBtn.style.display = 'inline-block';
-
-  updateProgress(index, 0, 0, 'scrolling');
+  // Update button to downloading state
+  const downloadBtn = document.getElementById(`download-${index}`) as HTMLButtonElement;
+  if (downloadBtn) {
+    downloadBtn.classList.add('downloading');
+    downloadBtn.disabled = true;
+    const btnText = downloadBtn.querySelector('.btn-text') as HTMLElement;
+    if (btnText) {
+      btnText.innerHTML = `0%<span class="separator">|</span>0 rows<span class="separator">|</span><span class="cancel-action">Cancel</span>`;
+    }
+  }
 
   const message: StartFullDownloadMessage = {
     action: 'startFullDownload',
@@ -145,11 +164,7 @@ async function cancelDownload(): Promise<void> {
   };
 
   await chrome.tabs.sendMessage(activeTabId, message);
-
-  const fullBtn = document.getElementById(`full-${currentDownloadIndex}`) as HTMLButtonElement;
-  if (fullBtn) fullBtn.disabled = false;
-
-  currentDownloadIndex = null;
+  // Button state reset is handled by updateProgress when 'cancelled' status arrives
 }
 
 /**
@@ -171,23 +186,20 @@ function renderTables(tables: TablesResponse['tables']): void {
 
   const tableListHTML = tables
     .map((table) => {
-      const typeLabel = table.type === 'price' ? 'Price Data' : 'Dividend Data';
+      const typeLabel = table.type === 'price' ? 'Price' : 'Dividend';
       return `
-    <div class="table-item">
+    <div class="table-item" data-type="${table.type}">
       <div class="table-info">
-        <div class="table-header">Table ${table.index + 1} - ${typeLabel} (${table.rows} rows × ${table.columns} cols)</div>
-        <div class="progress-container" id="progress-${table.index}" style="display: none;">
-          <div class="progress-bar">
-            <div class="progress-fill"></div>
-          </div>
+        <div class="table-header">
+          <span class="table-name">Table ${table.index + 1}</span>
+          <span class="table-type-badge ${table.type}">${typeLabel}</span>
         </div>
-        <div class="progress-text" id="progress-text-${table.index}"></div>
+        <div class="table-meta">${table.rows} rows × ${table.columns} cols</div>
       </div>
-      <div class="button-group">
-        <button class="btn-quick" data-index="${table.index}">Quick CSV</button>
-        <button class="btn-full" id="full-${table.index}" data-index="${table.index}">Full CSV</button>
-        <button class="btn-cancel" id="cancel-${table.index}" data-index="${table.index}" style="display: none;">Cancel</button>
-      </div>
+      <button class="download-btn" id="download-${table.index}" data-index="${table.index}" data-type="${table.type}">
+        <div class="progress-fill"></div>
+        <span class="btn-text">Download</span>
+      </button>
     </div>
   `;
     })
@@ -199,29 +211,23 @@ function renderTables(tables: TablesResponse['tables']): void {
     </div>
   `;
 
-  // Attach click handlers to quick download buttons
-  for (const button of Array.from(content.querySelectorAll('button.btn-quick'))) {
-    button.addEventListener('click', () => {
-      const index = Number.parseInt((button as HTMLButtonElement).dataset.index || '0');
-      const table = tables[index];
-      if (table) {
-        downloadCSV(table.csvData, table.type, currentTicker);
+  // Attach click handlers to download buttons
+  for (const button of Array.from(content.querySelectorAll('.download-btn'))) {
+    button.addEventListener('click', (e) => {
+      const btn = button as HTMLButtonElement;
+      const index = Number.parseInt(btn.dataset.index || '0');
+
+      // Check if we're in downloading state (cancel action)
+      if (btn.classList.contains('downloading')) {
+        // Only cancel if clicking on the cancel text
+        const target = e.target as HTMLElement;
+        if (target.classList.contains('cancel-action')) {
+          cancelDownload();
+        }
+        return;
       }
-    });
-  }
 
-  // Attach click handlers to full download buttons
-  for (const button of Array.from(content.querySelectorAll('button.btn-full'))) {
-    button.addEventListener('click', () => {
-      const index = Number.parseInt((button as HTMLButtonElement).dataset.index || '0');
       startFullDownload(index);
-    });
-  }
-
-  // Attach click handlers to cancel buttons
-  for (const button of Array.from(content.querySelectorAll('button.btn-cancel'))) {
-    button.addEventListener('click', () => {
-      cancelDownload();
     });
   }
 }
@@ -261,9 +267,7 @@ async function fetchTables(): Promise<void> {
     renderTables(response.tables);
   } catch (err) {
     console.error('Popup: Error fetching tables:', err);
-    showError(
-      'Failed to load tables. Make sure you refresh the page after installing the extension.'
-    );
+    showError('No supported tables found.');
   }
 }
 
@@ -278,32 +282,17 @@ chrome.runtime.onMessage.addListener((message: ProgressUpdate) => {
       updateProgress(currentDownloadIndex, message.progress, message.rowsCollected, message.status);
 
       if (message.status === 'complete' && message.csvData) {
-        // Get the table type from the stored tables
-        const content = document.getElementById('content');
-        const tableElements = content?.querySelectorAll('.table-item');
-        if (tableElements?.[currentDownloadIndex]) {
-          const tableElement = tableElements[currentDownloadIndex];
-          const headerText = tableElement?.querySelector('.table-header')?.textContent || '';
-          const tableType: TableType = headerText.includes('Dividend') ? 'dividend' : 'price';
-          downloadCSV(message.csvData, tableType, currentTicker);
-        }
-        const fullBtn = document.getElementById(
-          `full-${currentDownloadIndex}`
+        // Get the table type from the download button's data attribute
+        const downloadBtn = document.getElementById(
+          `download-${currentDownloadIndex}`
         ) as HTMLButtonElement;
-        if (fullBtn) fullBtn.disabled = false;
+        const tableType: TableType = (downloadBtn?.dataset.type as TableType) || 'price';
+        downloadCSV(message.csvData, tableType, currentTicker);
         currentDownloadIndex = null;
       } else if (message.status === 'error') {
         showError(message.error || 'An error occurred during download');
-        const fullBtn = document.getElementById(
-          `full-${currentDownloadIndex}`
-        ) as HTMLButtonElement;
-        if (fullBtn) fullBtn.disabled = false;
         currentDownloadIndex = null;
       } else if (message.status === 'cancelled') {
-        const fullBtn = document.getElementById(
-          `full-${currentDownloadIndex}`
-        ) as HTMLButtonElement;
-        if (fullBtn) fullBtn.disabled = false;
         currentDownloadIndex = null;
       }
     }
