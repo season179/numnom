@@ -13,9 +13,12 @@ import {
   SCROLL_PROGRESS_CAP,
   SCROLL_VIEWPORT_RATIO,
 } from '../shared/constants';
+import { createLogger } from '../shared/logger';
 import type { ProgressUpdate } from '../shared/types';
 import { hashRow } from '../shared/utils';
 import { cleanDividendData, getTableType, tableToArray } from './detection';
+
+const log = createLogger('content');
 
 // Module-level state for cancellation
 let downloadCancelled = false;
@@ -67,8 +70,8 @@ async function scrollAndCollectRows(
   const container = findScrollableContainer(table);
   const uniqueRows = new Map<string, string[]>();
 
-  console.log('NumNom: Starting scroll & collect');
-  console.log('NumNom: Scrollable container:', container);
+  log.debug('Starting scroll & collect');
+  log.debug('Scrollable container', { container: container?.tagName });
 
   // Collect initial rows
   const initialData = tableToArray(table);
@@ -77,7 +80,7 @@ async function scrollAndCollectRows(
   }
 
   if (!container) {
-    console.log('NumNom: No scrollable container found');
+    log.debug('No scrollable container found');
     return Array.from(uniqueRows.values());
   }
 
@@ -100,7 +103,7 @@ async function scrollAndCollectRows(
 
   while (scrollAttempts < MAX_SCROLL_ATTEMPTS && noNewRowsCount < MAX_NO_NEW_ROWS_ATTEMPTS) {
     if (downloadCancelled) {
-      console.log('NumNom: Download cancelled');
+      log.info('Download cancelled');
       onProgress({
         action: 'downloadProgress',
         progress: 0,
@@ -130,9 +133,7 @@ async function scrollAndCollectRows(
     const scrollHeight = getScrollHeight();
     const progress = Math.min(SCROLL_PROGRESS_CAP, Math.round((scrollTop / scrollHeight) * 100));
 
-    console.log(
-      `NumNom: Scroll progress: ${progress}%, Rows: ${uniqueRows.size}, ScrollTop: ${scrollTop}, ScrollHeight: ${scrollHeight}`
-    );
+    log.debug('Scroll progress', { progress, rows: uniqueRows.size, scrollTop, scrollHeight });
 
     onProgress({
       action: 'downloadProgress',
@@ -143,7 +144,7 @@ async function scrollAndCollectRows(
 
     // Check if we've reached the bottom
     if (scrollTop + clientHeight >= scrollHeight - BOTTOM_THRESHOLD_PX) {
-      console.log('NumNom: Reached bottom of scroll');
+      log.debug('Reached bottom of scroll');
 
       // Wait a bit more for any final content
       await new Promise((resolve) => setTimeout(resolve, FINAL_CONTENT_DELAY_MS));
@@ -166,7 +167,7 @@ async function scrollAndCollectRows(
     }
   }
 
-  console.log(`NumNom: Collection complete. Total unique rows: ${uniqueRows.size}`);
+  log.info('Collection complete', { totalRows: uniqueRows.size });
   return Array.from(uniqueRows.values());
 }
 
@@ -174,7 +175,7 @@ async function scrollAndCollectRows(
  * Handles full download request with scrolling
  */
 export async function handleFullDownload(tableIndex: number): Promise<void> {
-  console.log(`NumNom: Starting full download for table ${tableIndex}`);
+  log.info('Starting full download', { tableIndex });
 
   const allTables = document.querySelectorAll('table');
   const validTables = Array.from(allTables).filter((table) => {
@@ -183,7 +184,7 @@ export async function handleFullDownload(tableIndex: number): Promise<void> {
   });
 
   if (tableIndex >= validTables.length) {
-    console.error('NumNom: Invalid table index');
+    log.error('Invalid table index', { tableIndex, validCount: validTables.length });
     chrome.runtime.sendMessage({
       action: 'downloadProgress',
       progress: 0,
@@ -199,7 +200,7 @@ export async function handleFullDownload(tableIndex: number): Promise<void> {
 
   try {
     const allRows = await scrollAndCollectRows(table, (update) => {
-      chrome.runtime.sendMessage(update).catch(console.error);
+      chrome.runtime.sendMessage(update).catch((err) => log.error('Failed to send progress', err));
     });
 
     // Filter out completely empty rows
@@ -216,7 +217,7 @@ export async function handleFullDownload(tableIndex: number): Promise<void> {
       skipEmptyLines: true,
     });
 
-    console.log(`NumNom: Generated CSV with ${filteredRows.length} rows`);
+    log.info('Generated CSV', { rows: filteredRows.length });
 
     chrome.runtime.sendMessage({
       action: 'downloadProgress',
@@ -226,7 +227,7 @@ export async function handleFullDownload(tableIndex: number): Promise<void> {
       csvData,
     } as ProgressUpdate);
   } catch (error) {
-    console.error('NumNom: Error during full download:', error);
+    log.error('Error during full download', error);
     chrome.runtime.sendMessage({
       action: 'downloadProgress',
       progress: 0,

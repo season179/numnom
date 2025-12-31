@@ -3,6 +3,7 @@
  */
 
 import { BUTTON_RESET_DELAY_MS } from '../shared/constants';
+import { createLogger } from '../shared/logger';
 import type {
   CancelDownloadMessage,
   GetTablesMessage,
@@ -13,7 +14,9 @@ import type {
 } from '../shared/types';
 import { formatDateForFilename } from '../shared/utils';
 
-console.log('Popup: Script loaded!');
+const log = createLogger('popup');
+
+log.info('Script loaded');
 
 // State for tracking full downloads
 let currentDownloadIndex: number | null = null;
@@ -137,7 +140,7 @@ async function cancelDownload(): Promise<void> {
  * Renders the list of tables
  */
 function renderTables(tables: TablesResponse['tables']): void {
-  console.log('Popup: renderTables() called with', tables.length, 'tables');
+  log.debug('renderTables() called', { tableCount: tables.length });
   const content = document.getElementById('content');
   if (!content) return;
 
@@ -211,28 +214,28 @@ function showError(message: string): void {
  * Fetches tables from the active tab's content script
  */
 async function fetchTables(): Promise<void> {
-  console.log('Popup: fetchTables() started');
+  log.debug('fetchTables() started');
   try {
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-    console.log('Popup: Active tab:', tab);
+    log.debug('Active tab', { tabId: tab?.id, url: tab?.url });
 
     if (!tab?.id) {
-      console.error('Popup: No tab ID found');
+      log.error('No tab ID found');
       showError('Unable to access current tab.');
       return;
     }
 
     activeTabId = tab.id;
 
-    console.log('Popup: Sending getTables message to tab', tab.id);
+    log.debug('Sending getTables message', { tabId: tab.id });
     const message: GetTablesMessage = { action: 'getTables' };
     const response = (await chrome.tabs.sendMessage(tab.id, message)) as TablesResponse;
-    console.log('Popup: Received response:', response);
+    log.debug('Received response', { tableCount: response.tables.length, ticker: response.ticker });
 
     currentTicker = response.ticker;
     renderTables(response.tables);
   } catch (err) {
-    console.error('Popup: Error fetching tables:', err);
+    log.error('Error fetching tables', err);
     showError('No supported tables found.');
   }
 }
@@ -242,7 +245,7 @@ async function fetchTables(): Promise<void> {
  */
 chrome.runtime.onMessage.addListener((message: ProgressUpdate) => {
   if (message.action === 'downloadProgress') {
-    console.log('Popup: Received progress update:', message);
+    log.debug('Received progress update', { progress: message.progress, status: message.status });
 
     if (currentDownloadIndex !== null) {
       updateProgress(currentDownloadIndex, message.progress, message.rowsCollected, message.status);

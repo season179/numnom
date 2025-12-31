@@ -4,11 +4,14 @@
  */
 
 import { OBSERVER_RETRY_DELAY_MS } from '../shared/constants';
+import { createLogger } from '../shared/logger';
 import type { ContentScriptMessage, TablesResponse } from '../shared/types';
 import { detectTables, getValidTables } from './detection';
 import { cancelCurrentDownload, handleFullDownload } from './download';
 
-console.log('NumNom: Content script loaded!');
+const log = createLogger('content');
+
+log.info('Content script loaded');
 
 /**
  * Sets up MutationObserver to detect dynamically added tables
@@ -29,7 +32,7 @@ function setupObserver(): void {
     subtree: true,
   });
 
-  console.log('NumNom: Observer initialized');
+  log.info('Observer initialized');
 }
 
 // Run initial detection
@@ -45,24 +48,24 @@ chrome.runtime.onMessage.addListener(
     _sender: chrome.runtime.MessageSender,
     sendResponse: (response?: TablesResponse) => void
   ) => {
-    console.log('NumNom: Received message:', message);
+    log.debug('Received message', message);
 
     if (message.action === 'getTables') {
-      console.log('NumNom: Processing getTables request');
+      log.debug('Processing getTables request');
       try {
         const response = getValidTables();
-        console.log('NumNom: Sending response with', response.tables.length, 'tables');
+        log.debug('Sending response', { tableCount: response.tables.length });
         sendResponse(response);
       } catch (err) {
-        console.error('NumNom: Error processing getTables:', err);
+        log.error('Error processing getTables', err);
         sendResponse({ tables: [], ticker: 'unknown' });
       }
     } else if (message.action === 'startFullDownload') {
-      console.log('NumNom: Processing startFullDownload request');
+      log.debug('Processing startFullDownload request');
       handleFullDownload(message.tableIndex);
       // Don't call sendResponse for async operation
     } else if (message.action === 'cancelDownload') {
-      console.log('NumNom: Processing cancelDownload request');
+      log.debug('Processing cancelDownload request');
       cancelCurrentDownload();
     }
 

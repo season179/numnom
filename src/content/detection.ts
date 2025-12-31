@@ -4,8 +4,11 @@
  */
 
 import Papa from 'papaparse';
+import { createLogger } from '../shared/logger';
 import type { TableCountMessage, TableType, TablesResponse } from '../shared/types';
 import { normalizeTextForExcel, tokenize } from '../shared/utils';
+
+const log = createLogger('content');
 
 /**
  * Extracts stock ticker from the TradingView page
@@ -193,9 +196,9 @@ export function cleanDividendData(data: string[][]): string[][] {
  * Gets all valid tables and converts them to CSV format
  */
 export function getValidTables(): TablesResponse {
-  console.log('NumNom: getValidTables() called');
+  log.debug('getValidTables() called');
   const allTables = document.querySelectorAll('table');
-  console.log(`NumNom: Found ${allTables.length} total tables on page`);
+  log.debug('Found tables on page', { total: allTables.length });
 
   const validTablesWithTypes = Array.from(allTables)
     .map((table) => {
@@ -204,9 +207,11 @@ export function getValidTables(): TablesResponse {
     })
     .filter((item): item is { table: HTMLTableElement; type: TableType } => item !== null);
 
-  console.log(
-    `NumNom: ${validTablesWithTypes.length} valid tables found (price: ${validTablesWithTypes.filter((t) => t.type === 'price').length}, dividend: ${validTablesWithTypes.filter((t) => t.type === 'dividend').length})`
-  );
+  log.info('Valid tables found', {
+    count: validTablesWithTypes.length,
+    price: validTablesWithTypes.filter((t) => t.type === 'price').length,
+    dividend: validTablesWithTypes.filter((t) => t.type === 'dividend').length,
+  });
 
   const tables = validTablesWithTypes.map(({ table, type }, index) => {
     let data = tableToArray(table);
@@ -224,7 +229,7 @@ export function getValidTables(): TablesResponse {
     });
     const rows = data.length;
     const columns = data[0]?.length || 0;
-    console.log(`NumNom: Table ${index + 1} (${type}) - ${rows} rows × ${columns} columns`);
+    log.debug('Table processed', { index: index + 1, type, rows, columns });
 
     return {
       index,
@@ -236,8 +241,7 @@ export function getValidTables(): TablesResponse {
   });
 
   const ticker = extractStockTicker();
-  console.log('NumNom: Extracted ticker:', ticker);
-  console.log('NumNom: Returning tables response');
+  log.debug('Extracted ticker', { ticker });
   return { tables, ticker };
 }
 
@@ -258,6 +262,6 @@ export function detectTables(): void {
   };
 
   chrome.runtime.sendMessage(message).catch((err) => {
-    console.log('NumNom: Failed to send message', err);
+    log.error('Failed to send message', err);
   });
 }
